@@ -1,0 +1,17 @@
+{
+  "name": "JournAI - Diario Estelar",
+  "short_name": "JournAI",
+  "description": "Tu diario personal impulsado por las estrellas y la inteligencia artificial.",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#0a0a0a",
+  "theme_color": "#3b82f6",
+  "icons": [
+    {
+      "src": "icon.png",
+      "sizes": "1024x1024",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
