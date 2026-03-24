@@ -265,24 +265,25 @@ body {
   margin-top: auto;
 }
 
-.danger-icon-btn {
+.delete-btn-premium {
   background: transparent;
   border: none;
-  color: #ef4444;
+  color: #ef4444 !important;
   padding: 8px;
   cursor: pointer;
   transition: var(--transition-smooth);
-  font-size: 1.4rem;
+  font-size: 1.6rem !important; /* Larger as requested */
   display: flex;
   align-items: center;
   justify-content: center;
-  opacity: 0.7;
+  opacity: 0.8;
+  margin-left: auto; /* Push to the far right of the flex container */
 }
 
-.danger-icon-btn:hover {
+.delete-btn-premium:hover {
   opacity: 1;
-  transform: scale(1.2);
-  filter: drop-shadow(0 0 8px rgba(239, 68, 68, 0.4));
+  transform: scale(1.1);
+  filter: drop-shadow(0 0 10px rgba(239, 68, 68, 0.5));
 }
 
 .calendar-nav {
