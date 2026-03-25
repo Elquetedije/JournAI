@@ -1,3 +1,4 @@
+console.log('%c JournAI v1.1 ', 'background: #3b82f6; color: #fff; border-radius: 4px; padding: 2px 6px;');
 window.monthNames = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
     "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
 ];

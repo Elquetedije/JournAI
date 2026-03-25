@@ -163,7 +163,7 @@ class DriveService {
             console.log('[DriveService] --- FASE 1: Creando pestañas principales (Años) ---');
             const token = await this.getAccessToken();
             const folderId = await this.findOrCreateRecursiveFolder(token, 'AI/Gems/Background til journal 2');
-            const filename = 'JournAI Export';
+            const filename = 'Mi diario';
             
             let docId = await this.findFile(token, filename, 'application/vnd.google-apps.document', folderId);
             if (docId) {
