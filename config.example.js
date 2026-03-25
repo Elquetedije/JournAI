@@ -1,0 +1,6 @@
+// Fill with your own Google Cloud Console credentials
+window.CONFIG = {
+    PERSONAL_CLIENT_ID: 'YOUR_CLIENT_ID',
+    PERSONAL_CLIENT_SECRET: 'YOUR_CLIENT_SECRET',
+    PERSONAL_REFRESH_TOKEN: 'YOUR_REFRESH_TOKEN'
+};

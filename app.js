@@ -1,11 +1,12 @@
-const monthNames = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+window.monthNames = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
     "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
 ];
+const monthNames = window.monthNames;
 
 let currentDate = new Date();
 let selectedDate = null;
 let activeFilter = 'mood';
-let activeView = 'days'; // 'years', 'months', 'days'
+let activeView = 'days';
 
 // State management (LocalStorage)
 function getEntries() {
@@ -17,14 +18,24 @@ function saveEntry(dateKey, text, mood, activity, health) {
     entries[dateKey] = { text, mood, activity, health };
     localStorage.setItem('journAI_entries', JSON.stringify(entries));
     render();
+    checkTodayEntry();
+    
+    // Trigger cloud backup background check
+    checkAndPerformBackup();
+    triggerAutomatedDocExport();
 }
 
 function deleteEntry(dateKey) {
     const entries = getEntries();
-    if (confirm('¿Estás seguro de que deseas eliminar esta entrada?')) {
+    if (confirm('Estas seguro de que deseas eliminar esta entrada?')) {
         delete entries[dateKey];
         localStorage.setItem('journAI_entries', JSON.stringify(entries));
         render();
+        checkTodayEntry();
+        
+        // Trigger cloud backup background check
+        checkAndPerformBackup();
+        triggerAutomatedDocExport();
         return true;
     }
     return false;
@@ -33,6 +44,435 @@ function deleteEntry(dateKey) {
 function getDateKey(date) {
     return `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
 }
+
+// --- GOOGLE DRIVE SYNC LOGIC ---
+const syncStatus = document.getElementById('syncStatus');
+const syncNowBtn = document.getElementById('syncNowBtn');
+
+function updateSyncStatus(message, type = '') {
+    if (!syncStatus) return;
+    syncStatus.textContent = message;
+    syncStatus.className = 'sync-value ' + type;
+}
+
+async function handleSyncNow() {
+    if (syncNowBtn) {
+        syncNowBtn.disabled = true;
+        syncNowBtn.textContent = 'Sincronizando...';
+    }
+    updateSyncStatus('Sincronizando con Google Drive...', 'syncing');
+    
+    const entries = getEntries();
+    const success = await window.DriveService.performBackup(entries);
+    
+    if (success) {
+        const now = new Date();
+        localStorage.setItem('last_drive_backup', now.toISOString());
+        updateSyncStatus(`Sincronizado hoy a las ${now.getHours()}:${now.getMinutes().toString().padStart(2, '0')}`, 'success');
+        
+        // Also trigger Doc export on manual sync
+        triggerAutomatedDocExport();
+    } else {
+        updateSyncStatus('Error en la sincronización', 'error');
+    }
+    
+    if (syncNowBtn) {
+        syncNowBtn.disabled = false;
+        syncNowBtn.textContent = 'Sincronizar Ahora';
+    }
+}
+
+async function checkAndPerformBackup() {
+    const lastBackupStr = localStorage.getItem('last_drive_backup');
+    const now = new Date();
+    const today = now.toISOString().split('T')[0];
+    
+    if (lastBackupStr) {
+        const lastBackupDate = lastBackupStr.split('T')[0];
+        if (lastBackupDate === today) {
+            const lastBackup = new Date(lastBackupStr);
+            updateSyncStatus(`Sincronizado hoy a las ${lastBackup.getHours()}:${lastBackup.getMinutes().toString().padStart(2, '0')}`, 'success');
+            return; // Already backed up today
+        }
+    }
+    
+    // Perform backup if not done today
+    console.log('[JournAI] Automated daily backup triggered');
+    const entries = getEntries();
+    const success = await window.DriveService.performBackup(entries);
+    
+    if (success) {
+        localStorage.setItem('last_drive_backup', now.toISOString());
+        updateSyncStatus(`Sincronizado hoy a las ${now.getHours()}:${now.getMinutes().toString().padStart(2, '0')}`, 'success');
+    } else {
+        updateSyncStatus('Pendiente de sincronizar', 'error');
+    }
+}
+
+async function triggerAutomatedDocExport() {
+    const dataByYear = generateExportDocData();
+    await window.DriveService.performGoogleDocExport(dataByYear);
+}
+
+function generateExportDocData() {
+    const entries = getEntries();
+    const dataByYear = {};
+    
+    Object.keys(entries).sort().forEach(dateKey => {
+        const parts = dateKey.split('-').map(Number);
+        if (parts.length !== 3) return;
+        const [year, month, day] = parts;
+        if (!dataByYear[year]) dataByYear[year] = {};
+        if (!dataByYear[year][month]) dataByYear[year][month] = {};
+        dataByYear[year][month][day] = entries[dateKey];
+    });
+    return dataByYear;
+}
+
+function generateExportHTML() {
+    const entries = getEntries();
+    const dataByYear = {};
+    
+    // Group entries by year and month
+    Object.keys(entries).sort().forEach(dateKey => {
+        const parts = dateKey.split('-').map(Number);
+        if (parts.length !== 3) return;
+        const [year, month, day] = parts;
+        if (!dataByYear[year]) dataByYear[year] = {};
+        if (!dataByYear[year][month]) dataByYear[year][month] = {};
+        dataByYear[year][month][day] = entries[dateKey];
+    });
+
+    const years = Object.keys(dataByYear).sort((a,b) => b - a); // Inverse chronological for years
+    
+    let html = `<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JournAI - Diario Estelar Export</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&family=Inter:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #000000;
+            --surface: #0a0a0a;
+            --surface-2: #141414;
+            --accent: #3b82f6;
+            --text-primary: #ffffff;
+            --text-secondary: rgba(255, 255, 255, 0.6);
+            --border: rgba(255, 255, 255, 0.1);
+            --radius-md: 12px;
+            --radius-sm: 8px;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--bg);
+            color: var(--text-primary);
+            margin: 0;
+            padding: 0;
+            line-height: 1.6;
+            scrollbar-width: thin;
+            scrollbar-color: var(--accent) var(--bg);
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 4rem 2rem;
+        }
+
+        header {
+            margin-bottom: 4rem;
+            text-align: center;
+        }
+
+        h1 {
+            font-family: 'Outfit', sans-serif;
+            font-size: 3.5rem;
+            margin: 0;
+            letter-spacing: -0.04em;
+            background: linear-gradient(135deg, #fff 0%, rgba(255,255,255,0.4) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .tagline {
+            color: var(--text-secondary);
+            font-size: 1.1rem;
+            margin-top: 0.5rem;
+        }
+
+        /* Tabs UI */
+        .tabs-section {
+            margin-bottom: 3rem;
+            position: sticky;
+            top: 0;
+            background: var(--bg);
+            padding: 1rem 0;
+            z-index: 100;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .year-tabs {
+            display: flex;
+            gap: 1.5rem;
+            margin-bottom: 1rem;
+            overflow-x: auto;
+            padding: 0.5rem 0;
+        }
+
+        .tab {
+            font-family: 'Outfit', sans-serif;
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            padding: 0.5rem 0;
+            white-space: nowrap;
+            position: relative;
+        }
+
+        .tab:hover, .tab.active {
+            color: var(--text-primary);
+        }
+
+        .tab.active::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: var(--accent);
+            box-shadow: 0 0 10px var(--accent);
+        }
+
+        .month-tabs {
+            display: flex;
+            gap: 0.8rem;
+            flex-wrap: wrap;
+            padding-top: 0.5rem;
+        }
+
+        .month-tab {
+            font-size: 0.85rem;
+            padding: 0.4rem 1.2rem;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            cursor: pointer;
+            color: var(--text-secondary);
+            transition: all 0.2s ease;
+        }
+
+        .month-tab:hover {
+            border-color: var(--accent);
+            color: var(--text-primary);
+        }
+
+        .month-tab.active {
+            background: var(--accent);
+            color: #fff;
+            border-color: var(--accent);
+            box-shadow: 0 4px 15px rgba(59, 130, 246, 0.3);
+        }
+
+        /* Content Sections */
+        .year-content { display: none; }
+        .month-content { display: none; }
+        .year-content.active, .month-content.active { display: block; }
+
+        .entry {
+            background: linear-gradient(180deg, var(--surface) 0%, rgba(10,10,10,0.5) 100%);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+            padding: 2.5rem;
+            margin-bottom: 3rem;
+            transition: transform 0.3s ease;
+        }
+
+        .entry:hover {
+            border-color: rgba(255,255,255,0.2);
+        }
+
+        .entry-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 2rem;
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 1.5rem;
+        }
+
+        .entry-title {
+            font-family: 'Outfit', sans-serif;
+        }
+
+        .entry-day {
+            font-size: 2.5rem;
+            font-weight: 600;
+            line-height: 1;
+            margin-bottom: 0.2rem;
+        }
+
+        .entry-month-year {
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.1rem;
+            font-size: 0.8rem;
+        }
+
+        .entry-metrics {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 2rem;
+            text-align: right;
+        }
+
+        .metric-item {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .metric-label {
+            font-size: 0.7rem;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            margin-bottom: 0.3rem;
+        }
+
+        .metric-value {
+            font-family: 'Outfit', sans-serif;
+            font-size: 1.2rem;
+            font-weight: 600;
+        }
+
+        .entry-text {
+            font-size: 1.15rem;
+            color: rgba(255, 255, 255, 0.85);
+            white-space: pre-wrap;
+            line-height: 1.8;
+        }
+
+        .no-data {
+            text-align: center;
+            padding: 5rem;
+            color: var(--text-secondary);
+            font-style: italic;
+        }
+
+        @media (max-width: 600px) {
+            .entry-header { flex-direction: column; gap: 1.5rem; }
+            .entry-metrics { text-align: left; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>JournAI</h1>
+            <p class="tagline">Diario Estelar &bull; Registro Completo de Vivencias</p>
+        </header>
+
+        <div class="tabs-section">
+            <div class="year-tabs">
+                ${years.map(y => `<div class="tab" id="tab-year-${y}" onclick="switchYear('${y}')">${y}</div>`).join('')}
+            </div>
+            
+            ${years.map(y => `
+                <div id="wrapper-months-${y}" class="year-content">
+                    <div class="month-tabs">
+                        ${Object.keys(dataByYear[y]).sort((a,b) => a - b).map(m => `
+                            <div class="month-tab" id="tab-month-${y}-${m}" onclick="switchMonth('${y}', '${m}')">${monthNames[m]}</div>
+                        `).join('')}
+                    </div>
+                </div>
+            `).join('')}
+        </div>
+
+        <div id="content-pool">
+            ${years.map(y => 
+                Object.keys(dataByYear[y]).map(m => `
+                    <div id="container-${y}-${m}" class="month-content">
+                        ${Object.keys(dataByYear[y][m]).sort((a,b) => a - b).map(d => {
+                            const entry = dataByYear[y][m][d];
+                            return `
+                                <article class="entry">
+                                    <div class="entry-header">
+                                        <div class="entry-title">
+                                            <div class="entry-day">${d}</div>
+                                            <div class="entry-month-year">${monthNames[m]} ${y}</div>
+                                        </div>
+                                        <div class="entry-metrics">
+                                            <div class="metric-item">
+                                                <span class="metric-label">Mood</span>
+                                                <span class="metric-value">${entry.mood || 5}/10</span>
+                                            </div>
+                                            <div class="metric-item">
+                                                <span class="metric-label">Activity</span>
+                                                <span class="metric-value">${entry.activity || 5}/10</span>
+                                            </div>
+                                            <div class="metric-item">
+                                                <span class="metric-label">Health</span>
+                                                <span class="metric-value">${entry.health || 5}/10</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="entry-text">${entry.text}</div>
+                                </article>
+                            `;
+                        }).join('')}
+                    </div>
+                `).join('')
+            ).join('')}
+        </div>
+    </div>
+
+    <script>
+        function switchYear(year) {
+            // Update Year Tabs
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.getElementById('tab-year-' + year).classList.add('active');
+
+            // Update Month Wrappers
+            document.querySelectorAll('.year-content').forEach(w => w.classList.remove('active'));
+            const wrapper = document.getElementById('wrapper-months-' + year);
+            if (wrapper) {
+                wrapper.classList.add('active');
+                // Auto-select first available month in that year
+                const firstMonthTab = wrapper.querySelector('.month-tab');
+                if (firstMonthTab) firstMonthTab.click();
+            }
+        }
+
+        function switchMonth(year, month) {
+            // Update Month Tabs
+            document.querySelectorAll('.month-tab').forEach(t => t.classList.remove('active'));
+            document.getElementById('tab-month-' + year + '-' + month).classList.add('active');
+
+            // Update Content
+            document.querySelectorAll('.month-content').forEach(c => c.classList.remove('active'));
+            const content = document.getElementById('container-' + year + '-' + month);
+            if (content) {
+                content.classList.add('active');
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            }
+        }
+
+        // Initialize with first year/month
+        document.addEventListener('DOMContentLoaded', () => {
+            const firstYear = document.querySelector('.tab');
+            if (firstYear) firstYear.click();
+        });
+    </script>
+</body>
+</html>`;
+    return html;
+}
+
+if (syncNowBtn) syncNowBtn.addEventListener('click', handleSyncNow);
 
 // UI Elements
 const calendarGrid = document.getElementById('calendarGrid');
@@ -51,6 +491,7 @@ const saveIcon = document.getElementById('saveIcon');
 const saveText = document.getElementById('saveText');
 
 function updateSliderLabels() {
+    if (!moodSlider || !activitySlider || !healthSlider) return;
     moodValue.textContent = moodSlider.value;
     activityValue.textContent = activitySlider.value;
     healthValue.textContent = healthSlider.value;
@@ -63,9 +504,9 @@ function updateSliderLabels() {
     }
 }
 
-moodSlider.addEventListener('input', updateSliderLabels);
-activitySlider.addEventListener('input', updateSliderLabels);
-healthSlider.addEventListener('input', updateSliderLabels);
+if (moodSlider) moodSlider.addEventListener('input', updateSliderLabels);
+if (activitySlider) activitySlider.addEventListener('input', updateSliderLabels);
+if (healthSlider) healthSlider.addEventListener('input', updateSliderLabels);
 
 // Aggregation Logic
 function getAverageMetric(year, month = null) {
@@ -95,6 +536,7 @@ function getColorForValue(value) {
 }
 
 function render() {
+    if (!calendarGrid) return;
     calendarGrid.style.opacity = '0';
     setTimeout(() => {
         calendarGrid.innerHTML = '';
@@ -111,7 +553,7 @@ function render() {
 function renderDays() {
     const year = currentDate.getFullYear();
     const month = currentDate.getMonth();
-    viewTitle.textContent = `${monthNames[month]} ${year}`;
+    if (viewTitle) viewTitle.textContent = `${monthNames[month]} ${year}`;
     
     const firstDay = new Date(year, month, 1).getDay();
     const offset = firstDay === 0 ? 6 : firstDay - 1;
@@ -119,8 +561,8 @@ function renderDays() {
     const daysInPrevMonth = new Date(year, month, 0).getDate();
     const entries = getEntries();
     
-    // Add Weekdays header if not present (handled in HTML but needs cleanup if switching views)
-    document.querySelector('.weekdays').style.display = 'grid';
+    const weekdaysHeader = document.querySelector('.weekdays');
+    if (weekdaysHeader) weekdaysHeader.style.display = 'grid';
 
     for (let i = offset; i > 0; i--) {
         calendarGrid.appendChild(createDayElement(daysInPrevMonth - i + 1, 'other-month'));
@@ -146,7 +588,7 @@ function renderDays() {
 
 function renderMonths() {
     const year = currentDate.getFullYear();
-    viewTitle.textContent = `${year}`;
+    if (viewTitle) viewTitle.textContent = `${year}`;
     const weekdaysHeader = document.querySelector('.weekdays');
     if (weekdaysHeader) weekdaysHeader.style.display = 'none';
 
@@ -171,7 +613,7 @@ function renderMonths() {
 
 function renderYears() {
     const baseYear = Math.floor(currentDate.getFullYear() / 12) * 12;
-    viewTitle.textContent = `${baseYear} - ${baseYear + 11}`;
+    if (viewTitle) viewTitle.textContent = `${baseYear} - ${baseYear + 11}`;
     const weekdaysHeader = document.querySelector('.weekdays');
     if (weekdaysHeader) weekdaysHeader.style.display = 'none';
 
@@ -203,20 +645,22 @@ function createDayElement(content, className) {
 }
 
 // Navigation & Filters
-viewTitle.addEventListener('click', () => {
+if (viewTitle) viewTitle.addEventListener('click', () => {
     if (activeView === 'days') activeView = 'months';
     else if (activeView === 'months') activeView = 'years';
     render();
 });
 
-document.getElementById('prevBtn').addEventListener('click', () => {
+const prevBtn = document.getElementById('prevBtn');
+if (prevBtn) prevBtn.addEventListener('click', () => {
     if (activeView === 'days') currentDate.setMonth(currentDate.getMonth() - 1);
     else if (activeView === 'months') currentDate.setFullYear(currentDate.getFullYear() - 1);
     else if (activeView === 'years') currentDate.setFullYear(currentDate.getFullYear() - 12);
     render();
 });
 
-document.getElementById('nextBtn').addEventListener('click', () => {
+const nextBtn = document.getElementById('nextBtn');
+if (nextBtn) nextBtn.addEventListener('click', () => {
     if (activeView === 'days') currentDate.setMonth(currentDate.getMonth() + 1);
     else if (activeView === 'months') currentDate.setFullYear(currentDate.getFullYear() + 1);
     else if (activeView === 'years') currentDate.setFullYear(currentDate.getFullYear() + 12);
@@ -233,14 +677,49 @@ filterBtns.forEach(btn => {
     });
 });
 
-document.getElementById('writeTodayBtn').addEventListener('click', () => {
+const writeTodayBtn = document.getElementById('writeTodayBtn');
+if (writeTodayBtn) writeTodayBtn.addEventListener('click', () => {
     openModal(new Date());
 });
 
-document.getElementById('closeModal').addEventListener('click', closeModal);
+function showStep(step) {
+    const step1 = document.getElementById('step1');
+    const step2 = document.getElementById('step2');
+    if (!step1 || !step2) return;
+    
+    if (step === 1) {
+        step1.classList.add('active');
+        step2.classList.remove('active');
+    } else {
+        step1.classList.remove('active');
+        step2.classList.add('active');
+    }
+}
 
 function closeModal() {
-    entryModal.classList.add('hidden');
+    if (entryModal) entryModal.classList.add('hidden');
+    showStep(1);
+}
+
+const nxtStepBtn = document.getElementById('nextStep');
+if (nxtStepBtn) nxtStepBtn.addEventListener('click', () => showStep(2));
+
+const prvStepBtn = document.getElementById('prevStep');
+if (prvStepBtn) prvStepBtn.addEventListener('click', () => showStep(1));
+
+function checkTodayEntry() {
+    const entries = getEntries();
+    const todayKey = getDateKey(new Date());
+    const writeBtn = document.getElementById('writeTodayBtn');
+    if (!writeBtn) return;
+    
+    if (!entries[todayKey]) {
+        console.log("No entry for today, adding pulse");
+        writeBtn.classList.add('pulse');
+    } else {
+        console.log("Entry found for today, removing pulse");
+        writeBtn.classList.remove('pulse');
+    }
 }
 
 function openModal(date) {
@@ -249,180 +728,143 @@ function openModal(date) {
     const dateKey = getDateKey(date);
     const entry = entries[dateKey];
     
+    const isToday = date.toDateString() === new Date().toDateString();
     const isNew = !entry;
     const data = entry || { text: "", mood: 5, activity: 5, health: 5 };
     
-    modalDateTitle.textContent = `Entrada: ${date.getDate()} ${monthNames[date.getMonth()]} ${date.getFullYear()}`;
-    entryText.value = data.text || "";
-    moodSlider.value = data.mood || 5;
-    activitySlider.value = data.activity || 5;
-    healthSlider.value = data.health || 5;
+    if (modalDateTitle) {
+        modalDateTitle.textContent = isToday ? "Mi Dia" : `Entrada: ${date.getDate()} ${monthNames[date.getMonth()]}`;
+    }
+    
+    if (entryText) entryText.value = data.text || "";
+    if (moodSlider) moodSlider.value = data.mood || 5;
+    if (activitySlider) activitySlider.value = data.activity || 5;
+    if (healthSlider) healthSlider.value = data.health || 5;
     updateSliderLabels();
     
-    saveIcon.textContent = isNew ? '➕' : '✏️';
-    saveText.textContent = isNew ? 'Añadir Entrada' : 'Guardar Cambios';
+    if (saveIcon) saveIcon.textContent = isNew ? '✨' : '✏️';
+    if (saveText) saveText.textContent = isNew ? 'Guardar' : 'Actualizar';
     
     const deleteBtn = document.getElementById('deleteEntry');
-    if (isNew) deleteBtn.classList.add('hidden');
-    else deleteBtn.classList.remove('hidden');
+    if (deleteBtn) {
+        if (isNew) deleteBtn.classList.add('hidden');
+        else deleteBtn.classList.remove('hidden');
+    }
     
-    entryModal.classList.remove('hidden');
-    entryText.focus();
+    showStep(1);
+    if (entryModal) entryModal.classList.remove('hidden');
+    if (entryText) entryText.focus();
 }
 
-document.getElementById('saveEntry').addEventListener('click', () => {
+const saveEntryBtn = document.getElementById('saveEntry');
+if (saveEntryBtn) saveEntryBtn.addEventListener('click', () => {
     if (selectedDate) {
         saveEntry(getDateKey(selectedDate), entryText.value, parseInt(moodSlider.value), parseInt(activitySlider.value), parseInt(healthSlider.value));
         closeModal();
     }
 });
 
-// Export to Google-Doc compatible format
-function exportToFormattedDoc() {
-    const entries = getEntries();
-    const sortedDates = Object.keys(entries).sort();
-    
-    let html = `
-    <html>
-    <head>
-        <meta charset="UTF-8">
-        <style>
-            body { font-family: 'Inter', 'Segoe UI', Arial, sans-serif; line-height: 1.6; color: #1a1a1a; max-width: 900px; margin: 0 auto; padding: 50px; background: #fff; }
-            .doc-header { text-align: center; margin-bottom: 50px; border-bottom: 3px double #333; padding-bottom: 20px; }
-            h1 { font-size: 2.5em; margin: 0; }
-            h2 { color: #1a1a1a; margin-top: 60px; font-size: 2em; border-bottom: 1px solid #ddd; }
-            h3 { color: #444; margin-top: 40px; font-size: 1.5em; border-left: 5px solid #3b82f6; padding-left: 15px; }
-            .entry { margin-bottom: 40px; border-bottom: 1px solid #f0f0f0; padding-bottom: 20px; }
-            .date { font-weight: 700; font-size: 1.2em; margin-bottom: 8px; }
-            .metrics { display: flex; gap: 15px; font-size: 0.85em; color: #666; background: #f8fafc; padding: 8px 12px; border-radius: 6px; margin: 10px 0; }
-            .content { font-size: 1.1em; color: #374151; white-space: pre-wrap; line-height: 1.7; }
-            @media print { .no-print { display: none; } }
-        </style>
-    </head>
-    <body>
-        <h1>JournAI - Diario Estelar Completo</h1>
-        <p style="text-align: center; color: #666;">Exportado el ${new Date().toLocaleDateString()}</p>
-        
-        <div class="toc">
-            <h2>Tabla de Contenidos</h2>
-            <ul>
-    `;
-
-    const structure = {};
-    sortedDates.forEach(key => {
-        const [year, month, day] = key.split('-').map(Number);
-        if (!structure[year]) structure[year] = {};
-        if (!structure[year][month]) structure[year][month] = [];
-        structure[year][month].push({ day, ...entries[key] });
-    });
-
-    Object.keys(structure).sort().forEach(year => {
-        html += `<li><a href="#year-${year}">Año ${year}</a></li>`;
-    });
-    
-    html += `</ul></div>`;
-
-    Object.keys(structure).sort().forEach(year => {
-        html += `<h2 id="year-${year}">Año ${year}</h2>`;
-        Object.keys(structure[year]).sort((a,b) => a-b).forEach(month => {
-            html += `<h3 id="year-${year}-month-${month}">${monthNames[month]} ${year}</h3>`;
-            structure[year][month].sort((a,b) => a.day - b.day).forEach(entry => {
-                html += `
-                <div class="entry">
-                    <div class="date">${entry.day} de ${monthNames[month]}</div>
-                    <div class="metrics">Ánimo: ${entry.mood}/10 | Actividad: ${entry.activity}/10 | Salud: ${entry.health}/10</div>
-                    <div class="content">${entry.text || "*Sin texto escrito*"}</div>
-                </div>`;
-            });
-        });
-    });
-
-    html += `</body></html>`;
-    
-    const blob = new Blob([html], { type: 'text/html' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `Diario_JournAI_${new Date().getFullYear()}.html`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-}
-
-document.getElementById('exportDoc').addEventListener('click', exportToFormattedDoc);
-
-// Settings Modal Selectors
-const settingsModal = document.getElementById('settingsModal');
-const settingsBtn = document.getElementById('settingsBtn');
-const closeSettings = document.getElementById('closeSettings');
-const downloadBackupBtn = document.getElementById('downloadBackup');
-const uploadBackupBtn = document.getElementById('uploadBackupBtn');
-const importFile = document.getElementById('importFile');
-
-// Open/Close Settings
-settingsBtn.addEventListener('click', () => {
-    settingsModal.classList.remove('hidden');
-});
-
-closeSettings.addEventListener('click', () => {
-    settingsModal.classList.add('hidden');
-});
-
-// Data Management: Download JSON
-downloadBackupBtn.addEventListener('click', () => {
-    const entries = getEntries();
-    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(entries, null, 2));
-    const downloadAnchor = document.createElement('a');
-    downloadAnchor.setAttribute("href", dataStr);
-    downloadAnchor.setAttribute("download", `journai_backup_${new Date().toISOString().split('T')[0]}.json`);
-    document.body.appendChild(downloadAnchor);
-    downloadAnchor.click();
-    downloadAnchor.remove();
-});
-
-// Data Management: Restore JSON
-uploadBackupBtn.addEventListener('click', () => {
-    importFile.click();
-});
-
-importFile.addEventListener('change', (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (event) => {
-        try {
-            const importedData = JSON.parse(event.target.result);
-            if (confirm('¿Estás seguro de que deseas restaurar esta copia? Esto sobrescribirá tus datos actuales.')) {
-                localStorage.setItem('journAI_entries', JSON.stringify(importedData));
-                render();
-                settingsModal.classList.add('hidden');
-                alert('¡Copia restaurada con éxito!');
-            }
-        } catch (err) {
-            alert('Error al leer el archivo. Asegúrate de que sea un JSON válido.');
-        }
-    };
-    reader.readAsText(file);
-});
-
-// Global Keyboard Shortcuts (Premium UX)
-window.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') {
+const deleteEntryBtn = document.getElementById('deleteEntry');
+if (deleteEntryBtn) deleteEntryBtn.addEventListener('click', () => {
+    if (selectedDate && deleteEntry(getDateKey(selectedDate))) {
         closeModal();
-        settingsModal.classList.add('hidden');
     }
 });
 
-// Initial Render
-render();
+function getEntriesGrouped() {
+    const entries = getEntries();
+    const grouped = {};
+    Object.keys(entries).forEach(key => {
+        const [year, month, day] = key.split('-').map(Number);
+        if (!grouped[year]) grouped[year] = {};
+        if (!grouped[year][month]) grouped[year][month] = {};
+        grouped[year][month][day] = entries[key];
+    });
+    return grouped;
+}
 
-// Service Worker Registration for PWA
-if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js')
-            .then(reg => console.log('Service Worker registrado', reg))
-            .catch(err => console.log('Error al registrar Service Worker', err));
+async function exportToGoogleDoc() {
+    const btn = document.getElementById('exportDoc');
+    const originalText = btn.innerHTML;
+    try {
+        btn.innerHTML = '<span class="loading-spinner"></span> Exportando...';
+        btn.disabled = true;
+        const data = getEntriesGrouped();
+        const success = await DriveService.performGoogleDocExport(data);
+        if (success) {
+            alert('¡Exportación a Google Docs completada con éxito!');
+        } else {
+            alert('Error en la exportación. Revisa la consola.');
+        }
+    } catch (e) {
+        console.error(e);
+        alert('Error crítico: ' + e.message);
+    } finally {
+        btn.innerHTML = originalText;
+        btn.disabled = false;
+    }
+}
+
+const exportDocBtn = document.getElementById('exportDoc');
+if (exportDocBtn) exportDocBtn.addEventListener('click', exportToGoogleDoc);
+
+const settingsBtn = document.getElementById('settingsBtn');
+const settingsModal = document.getElementById('settingsModal');
+if (settingsBtn) settingsBtn.addEventListener('click', () => {
+    if (settingsModal) settingsModal.classList.remove('hidden');
+});
+
+const closeSettings = document.getElementById('closeSettings');
+if (closeSettings) closeSettings.addEventListener('click', () => {
+    if (settingsModal) settingsModal.classList.add('hidden');
+});
+
+const downloadBackupBtn = document.getElementById('downloadBackup');
+if (downloadBackupBtn) downloadBackupBtn.addEventListener('click', () => {
+    const entries = getEntries();
+    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(entries, null, 2));
+    const a = document.createElement('a');
+    a.href = dataStr;
+    a.download = `journai_backup.json`;
+    a.click();
+});
+
+const uploadBackupBtn = document.getElementById('uploadBackupBtn');
+const importFile = document.getElementById('importFile');
+if (uploadBackupBtn && importFile) {
+    uploadBackupBtn.addEventListener('click', () => importFile.click());
+    importFile.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            try {
+                const importedData = JSON.parse(event.target.result);
+                if (confirm('Deseas restaurar esta copia?')) {
+                    localStorage.setItem('journAI_entries', JSON.stringify(importedData));
+                    render();
+                    if (settingsModal) settingsModal.classList.add('hidden');
+                }
+            } catch (err) { alert('Error al leer el archivo.'); }
+        };
+        reader.readAsText(file);
     });
 }
 
+window.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+        closeModal();
+        if (settingsModal) settingsModal.classList.add('hidden');
+    }
+});
+
+// Init
+render();
+checkTodayEntry();
+checkAndPerformBackup();
+
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js').catch(err => console.log(err));
+    });
+}
