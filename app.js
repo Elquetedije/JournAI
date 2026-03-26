@@ -148,15 +148,13 @@ async function triggerAutomatedDocExport() {
 
 async function performStartupSync() {
     showSyncIndicator();
-    console.log('[JournAI] performStartupSync started');
+    console.log('[JournAI] performStartupSync started (Replacement Mode)');
     updateSyncStatus('Sincronizando datos de otros dispositivos...', 'syncing');
     try {
         const remoteEntries = await window.DriveService.getSyncData();
         if (remoteEntries && Object.keys(remoteEntries).length > 0) {
-            const localEntries = getEntries();
-            console.log(`[JournAI] Merging local (${Object.keys(localEntries).length}) with remote (${Object.keys(remoteEntries).length})`);
-            const mergedEntries = { ...localEntries, ...remoteEntries };
-            localStorage.setItem('journAI_entries', JSON.stringify(mergedEntries));
+            console.log(`[JournAI] Replacing local data with remote data (${Object.keys(remoteEntries).length} entries)`);
+            localStorage.setItem('journAI_entries', JSON.stringify(remoteEntries));
             console.log('[JournAI] Startup sync completed');
             render();
             checkTodayEntry();
