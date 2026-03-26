@@ -1,4 +1,4 @@
-console.log('%c JournAI v1.1 ', 'background: #3b82f6; color: #fff; border-radius: 4px; padding: 2px 6px;');
+console.log('%c JournAI v1.2 ', 'background: #3b82f6; color: #fff; border-radius: 4px; padding: 2px 6px;');
 window.monthNames = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
     "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
 ];
@@ -1067,6 +1067,7 @@ initApp();
 
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js').catch(err => console.log(err));
+        // Register sw.js with a version query to force browser to check it
+        navigator.serviceWorker.register('./sw.js?v=15').catch(err => console.log(err));
     });
 }

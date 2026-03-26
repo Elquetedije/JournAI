@@ -1,4 +1,4 @@
-const CACHE_NAME = 'journai-v14';
+const CACHE_NAME = 'journai-v15';
 const ASSETS = [
     './',
     './index.html',
