@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>JournAI - Diario Estelar</title>
-    <link rel="stylesheet" href="style.css?v=5">
+    <link rel="stylesheet" href="style.css?v=6">
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#0a0a0a">
     <link rel="apple-touch-icon" href="icon-192.png">
@@ -12,6 +12,9 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&display=swap" rel="stylesheet">
+    <div id="syncIndicator" class="sync-indicator hidden" title="Sincronizando con Drive...">
+        <div class="spinner"></div>
+    </div>
 </head>
 <body>
     <div class="starry-background">
@@ -105,7 +108,7 @@
 
                     <section class="settings-section drive-sync-section">
                         <h3>Sincronización Cloud</h3>
-                        <p>Tus datos se guardan automáticamente en tu carpeta personal <strong>JournAI Backups</strong> en Google Drive cada 24 horas.</p>
+                        <p>Tus datos se guardan automáticamente en tu carpeta personal <strong>JournAI Backups/Backup b</strong> en Google Drive cada 24 horas.</p>
                         <div class="sync-status-card glass-card-dark">
                             <div class="sync-info">
                                 <span class="sync-icon">☁️</span>
@@ -123,7 +126,7 @@
 
         <!-- Entry Modal -->
         <div id="entryModal" class="modal-overlay hidden">
-            <div class="modal-content">
+            <div class="entry-modal-view">
                 <!-- Step 1: Text Input -->
                 <div id="step1" class="entry-step active">
                     <button class="close-btn" onclick="closeModal()">&times;</button>
@@ -143,7 +146,10 @@
 
                 <!-- Step 2: Metrics Reflection -->
                 <div id="step2" class="entry-step">
-                    <button class="back-btn" id="prevStep">← Atrás</button>
+                    <div class="step2-header">
+                        <button class="back-btn" id="prevStep">← Atrás</button>
+                        <button id="skipMoodBtn" class="skip-btn-premium">Saltar →</button>
+                    </div>
                     <button id="deleteEntry" class="delete-btn-premium hidden">🗑️</button>
                     
                     <section class="reflection-main">
@@ -179,6 +185,6 @@
 
     <script src="config.js?v=2"></script>
     <script src="driveService.js?v=2"></script>
-    <script src="app.js?v=2"></script>
+    <script src="app.js?v=3"></script>
 </body>
 </html>

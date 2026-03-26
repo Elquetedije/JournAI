@@ -18,6 +18,10 @@
   --entry-indicator: #00ffcc;
 }
 
+.hidden {
+  display: none !important;
+}
+
 * {
   margin: 0;
   padding: 0;
@@ -686,67 +690,95 @@ body {
   font-size: 1rem;
 }
 
-/* Modal Overlay (Generic for Entry) */
-.modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: rgba(0, 0, 0, 0.7);
-  backdrop-filter: blur(4px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 2000;
-  transition: opacity 0.3s ease;
-}
+/* Desktop Modal Layouts */
+@media (min-width: 769px) {
+  .modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(4px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 2000;
+    transition: opacity 0.3s ease;
+  }
 
-.modal-overlay.hidden {
-  opacity: 0;
-  pointer-events: none;
-}
+  .modal-overlay.hidden {
+    opacity: 0;
+    pointer-events: none;
+  }
 
-.modal-content {
-  width: 95%;
-  max-width: 1200px;
-  height: 85vh;
-  display: grid;
-  grid-template-columns: 2fr 1fr;
-  gap: 0;
-  padding: 0;
-  position: relative; /* CRITICAL: Anchor for floating delete icon */
-  overflow: visible; /* CRITICAL: Allow icon to sit outside border */
-  border: 1px solid var(--border-color);
-  box-shadow: 0 0 50px rgba(0, 0, 0, 0.5), 0 0 30px var(--glow-color, rgba(255, 255, 255, 0.05));
-  transition: box-shadow 0.4s ease;
-}
+  .entry-modal-view {
+    width: 95%;
+    max-width: 1200px;
+    height: 85vh;
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 0;
+    padding: 0;
+    position: relative;
+    overflow: visible;
+    border: 1px solid var(--border-color);
+    box-shadow: 0 0 50px rgba(0, 0, 0, 0.5), 0 0 30px var(--glow-color, rgba(255, 255, 255, 0.05));
+    transition: box-shadow 0.4s ease;
+  }
 
-.editor-main {
-  padding: 3rem;
-  display: flex;
-  flex-direction: column;
-  gap: 2rem;
-  background: rgba(255, 255, 255, 0.02);
-}
+  .editor-main {
+    padding: 3rem;
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+    background: rgba(255, 255, 255, 0.02);
+  }
 
-.editor-sidebar {
-  padding: 3rem;
-  background: rgba(0, 0, 0, 0.2);
-  border-left: var(--border-thin);
-  display: flex;
-  flex-direction: column;
-  gap: 2.5rem;
-}
+  .editor-sidebar {
+    padding: 3rem;
+    background: rgba(0, 0, 0, 0.2);
+    border-left: var(--border-thin);
+    display: flex;
+    flex-direction: column;
+    gap: 2.5rem;
+  }
 
-.entry-step {
-  display: none;
-  width: 100%;
-  height: 100%;
-}
+  .entry-step {
+    display: none;
+    width: 100%;
+    height: 100%;
+  }
 
-.entry-step.active {
-  display: contents; /* Allow children to participate in the modal-content grid */
+  .entry-step.active {
+    display: contents;
+  }
+
+  .step2-header {
+    position: absolute;
+    top: 3rem;
+    left: 3rem;
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+    z-index: 100;
+  }
+
+  .skip-btn-premium {
+    background: transparent;
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    font-size: 0.9rem;
+    font-weight: 500;
+    transition: var(--transition-smooth);
+    padding: 5px;
+  }
+
+  .skip-btn-premium:hover {
+    color: var(--text-primary);
+    transform: translateX(3px);
+  }
 }
 
 .modal-header {
@@ -772,6 +804,39 @@ body {
   font-family: inherit;
   outline: none;
   padding: 0;
+}
+
+/* Sync Indicator Overlay */
+.sync-indicator {
+    position: fixed;
+    top: 1.5rem;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 9999;
+    padding: 12px;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(10px);
+    border: var(--border-thin);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+    transition: var(--transition-smooth);
+}
+
+.spinner {
+    width: 24px;
+    height: 24px;
+    border: 2px solid rgba(255, 255, 255, 0.1);
+    border-top: 2px solid var(--accent-color);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
 }
 
 .metrics-container {
@@ -1065,7 +1130,7 @@ input[type="range"]::-webkit-slider-thumb {
     backdrop-filter: none !important;
   }
 
-  #app .modal-content {
+  #app .entry-modal-view {
     background: #000 !important;
     height: 100vh !important;
     width: 100vw !important;
@@ -1222,6 +1287,34 @@ input[type="range"]::-webkit-slider-thumb {
     align-items: center !important;
     justify-content: center !important;
     gap: 1rem !important;
+  }
+
+  .step2-header {
+    position: absolute !important;
+    top: 1.5rem !important;
+    left: 1.5rem !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 1rem !important;
+    z-index: 100 !important;
+  }
+
+  .back-btn, .skip-btn-premium {
+    position: static !important; /* Reset since they are now in step2-header */
+  }
+
+  .skip-btn-premium {
+    background: transparent !important;
+    border: none !important;
+    color: var(--text-secondary) !important;
+    font-size: 0.9rem !important;
+    font-weight: 600 !important;
+    padding: 10px !important;
+  }
+
+  .skip-btn-premium:active {
+    color: var(--text-primary) !important;
+    transform: translateX(4px) !important;
   }
 
   /* FAB Pulse Animation */

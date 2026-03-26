@@ -72,6 +72,51 @@ class DriveService {
         return createData.id;
     }
 
+    static async performBackup(entries) {
+        try {
+            const token = await this.getAccessToken();
+            const folderId = await this.findOrCreateRecursiveFolder(token, 'JournAI Backups/Backup b');
+            const content = JSON.stringify(entries, null, 2);
+            await this.findOrCreateFile(token, 'journai_backup.json', folderId, content);
+            return true;
+        } catch (e) {
+            console.error('[DriveService] Backup Failed:', e);
+            return false;
+        }
+    }
+
+    static async syncData(entries) {
+        try {
+            const token = await this.getAccessToken();
+            const folderId = await this.findOrCreateRecursiveFolder(token, 'JournAI Backups/Sincronizacion');
+            const content = JSON.stringify(entries, null, 2);
+            await this.findOrCreateFile(token, 'sync_data.json', folderId, content);
+            return true;
+        } catch (e) {
+            console.error('[DriveService] Sync Update Failed:', e);
+            return false;
+        }
+    }
+
+    static async getSyncData() {
+        try {
+            const token = await this.getAccessToken();
+            const folderId = await this.findOrCreateRecursiveFolder(token, 'JournAI Backups/Sincronizacion');
+            const fileId = await this.findFile(token, 'sync_data.json', 'application/json', folderId);
+            
+            if (!fileId) return null;
+
+            const res = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (!res.ok) throw new Error('Failed to fetch sync data');
+            return await res.json();
+        } catch (e) {
+            console.error('[DriveService] Sync Download Failed:', e);
+            return null;
+        }
+    }
+
     static async findOrCreateFile(accessToken, filename, folderId, content) {
         const q = `name='${filename}' and '${folderId}' in parents and trashed=false`;
         const searchUrl = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id, name)`;
@@ -160,24 +205,45 @@ class DriveService {
 
     static async performGoogleDocExport(dataByYear) {
         try {
-            console.log('[DriveService] --- FASE 1: Creando pestañas principales (Años) ---');
+            console.log('[DriveService] --- INICIANDO EXPORTACIÓN (Modo Actualización) ---');
             const token = await this.getAccessToken();
             const folderId = await this.findOrCreateRecursiveFolder(token, 'AI/Gems/Background til journal 2');
             const filename = 'Mi diario';
             
             let docId = await this.findFile(token, filename, 'application/vnd.google-apps.document', folderId);
-            if (docId) {
-                await fetch(`https://www.googleapis.com/drive/v3/files/${docId}`, {
-                    method: 'DELETE',
-                    headers: { 'Authorization': `Bearer ${token}` }
+            if (!docId) {
+                docId = await this.createEmptyDoc(token, filename, folderId);
+                console.log('[DriveService] Documento nuevo creado.');
+            } else {
+                console.log('[DriveService] Documento existente encontrado. Limpiando estructura...');
+                // Limpiar: Eliminar todas las pestañas excepto la primera (Index)
+                const doc = await this.getDoc(token, docId);
+                if (doc && doc.tabs && doc.tabs.length > 1) {
+                    const deleteRequests = doc.tabs.slice(1).map(tab => ({
+                        deleteDocumentTab: { tabId: tab.tabId }
+                    }));
+                    await fetch(`https://docs.googleapis.com/v1/documents/${docId}:batchUpdate`, {
+                        method: 'POST',
+                        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ requests: deleteRequests })
+                    });
+                }
+                // Limpiar el contenido de la primera pestaña para usarla como portada
+                await fetch(`https://docs.googleapis.com/v1/documents/${docId}:batchUpdate`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ requests: [
+                        { deleteContentRange: { range: { startIndex: 1, endIndex: 2 }, tabId: doc.tabs[0].tabId } }, // Minimal clear
+                        { insertText: { location: { tabId: doc.tabs[0].tabId, index: 1 }, text: "MI DIARIO - JOURNAI\n\nEste documento se actualiza automáticamente.\nUtiliza las pestañas laterales para navegar por años y meses." } }
+                    ]})
                 });
             }
-            docId = await this.createEmptyDoc(token, filename, folderId);
 
             const years = Object.keys(dataByYear).sort((a,b) => b - a);
             if (years.length === 0) return true;
 
             // FASE 1: Crear años únicamente
+            console.log('[DriveService] --- FASE 1: Creando pestañas principales (Años) ---');
             const phase1Requests = years.map(year => ({ 
                 addDocumentTab: { tabProperties: { title: year } } 
             }));

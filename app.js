@@ -21,7 +21,9 @@ function saveEntry(dateKey, text, mood, activity, health) {
     render();
     checkTodayEntry();
     
-    // Trigger cloud backup background check
+    // Trigger cloud sync and backup
+    showSyncIndicator();
+    window.DriveService.syncData(entries).finally(() => hideSyncIndicator());
     checkAndPerformBackup();
     triggerAutomatedDocExport();
 }
@@ -34,7 +36,9 @@ function deleteEntry(dateKey) {
         render();
         checkTodayEntry();
         
-        // Trigger cloud backup background check
+        // Trigger cloud sync and backup
+        showSyncIndicator();
+        window.DriveService.syncData(entries).finally(() => hideSyncIndicator());
         checkAndPerformBackup();
         triggerAutomatedDocExport();
         return true;
@@ -110,9 +114,37 @@ async function checkAndPerformBackup() {
     }
 }
 
+function showSyncIndicator() {
+    const indicator = document.getElementById('syncIndicator');
+    if (indicator) indicator.classList.remove('hidden');
+}
+
+function hideSyncIndicator() {
+    const indicator = document.getElementById('syncIndicator');
+    if (indicator) indicator.classList.add('hidden');
+}
+
 async function triggerAutomatedDocExport() {
     const dataByYear = generateExportDocData();
     await window.DriveService.performGoogleDocExport(dataByYear);
+}
+
+async function performStartupSync() {
+    showSyncIndicator();
+    updateSyncStatus('Sincronizando datos de otros dispositivos...', 'syncing');
+    try {
+        const remoteEntries = await window.DriveService.getSyncData();
+        if (remoteEntries) {
+            const localEntries = getEntries();
+            const mergedEntries = { ...localEntries, ...remoteEntries };
+            localStorage.setItem('journAI_entries', JSON.stringify(mergedEntries));
+            console.log('[JournAI] Startup sync completed');
+            render();
+            checkTodayEntry();
+        }
+    } finally {
+        hideSyncIndicator();
+    }
 }
 
 function generateExportDocData() {
@@ -499,7 +531,7 @@ function updateSliderLabels() {
     
     // Reactive Glow for Modal
     const colors = getColorForValue(parseInt(moodSlider.value));
-    const modalContent = document.querySelector('#entryModal .modal-content');
+    const modalContent = document.querySelector('#entryModal .entry-modal-view');
     if (modalContent) {
         modalContent.style.setProperty('--glow-color', colors.glow);
     }
@@ -518,8 +550,11 @@ function getAverageMetric(year, month = null) {
     Object.keys(entries).forEach(key => {
         const [eYear, eMonth] = key.split('-').map(Number);
         if (eYear === year && (month === null || eMonth === month)) {
-            total += entries[key][activeFilter] || 5;
-            count++;
+            const val = entries[key][activeFilter];
+            if (val !== undefined && val !== null) {
+                total += val;
+                count++;
+            }
         }
     });
     
@@ -577,9 +612,11 @@ function renderDays() {
         
         if (entry) {
             const colors = getColorForValue(entry[activeFilter]);
-            dayDiv.style.backgroundColor = colors.bg;
-            dayDiv.style.borderColor = colors.border;
-            dayDiv.style.setProperty('--glow-color', colors.glow);
+            if (colors) {
+                dayDiv.style.backgroundColor = colors.bg;
+                dayDiv.style.borderColor = colors.border;
+                dayDiv.style.setProperty('--glow-color', colors.glow);
+            }
             dayDiv.classList.add('has-entry');
         }
         dayDiv.addEventListener('click', () => openModal(date));
@@ -765,6 +802,15 @@ if (saveEntryBtn) saveEntryBtn.addEventListener('click', () => {
     }
 });
 
+const skipMoodBtn = document.getElementById('skipMoodBtn');
+if (skipMoodBtn) skipMoodBtn.addEventListener('click', () => {
+    if (selectedDate) {
+        // Save only text, pass null for metrics
+        saveEntry(getDateKey(selectedDate), entryText.value, null, null, null);
+        closeModal();
+    }
+});
+
 const deleteEntryBtn = document.getElementById('deleteEntry');
 if (deleteEntryBtn) deleteEntryBtn.addEventListener('click', () => {
     if (selectedDate && deleteEntry(getDateKey(selectedDate))) {
@@ -862,7 +908,8 @@ window.addEventListener('keydown', (e) => {
 // Init
 render();
 checkTodayEntry();
-checkAndPerformBackup();
+performStartupSync(); // Inter-device sync
+checkAndPerformBackup(); // Daily backup check
 
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
