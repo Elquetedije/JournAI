@@ -690,6 +690,8 @@ body {
   padding: 1.5rem 3rem 3rem 3rem;
   overflow-y: auto;
   flex: 1;
+  -webkit-overflow-scrolling: touch; /* Added */
+  touch-action: pan-y; /* Added */
 }
 
 #settingsModal .modal-header {
@@ -1275,20 +1277,7 @@ input[type="range"]::-webkit-slider-thumb {
     to { transform: rotate(360deg); }
   }
 
-  /* Ensure close button is visible in Step 2 */
-  .entry-step .close-btn {
-    position: absolute !important;
-    top: 1.5rem !important;
-    right: 1.5rem !important;
-    z-index: 5000 !important;
-  }
 
-  .entry-step .delete-btn-premium {
-    position: absolute !important;
-    top: 1.5rem !important;
-    right: 4.5rem !important;
-    z-index: 5000 !important;
-  }
 
   .entry-step {
     display: none !important;
@@ -1310,22 +1299,6 @@ input[type="range"]::-webkit-slider-thumb {
     to { opacity: 1; transform: translateY(0); }
   }
 
-  .close-btn {
-    position: absolute !important;
-    top: 1.5rem !important;
-    right: 1.5rem !important;
-    width: 44px !important;
-    height: 44px !important;
-    padding: 0 !important;
-    font-size: 1.5rem !important;
-    background: rgba(255, 255, 255, 0.1) !important;
-    border: 1px solid rgba(255, 255, 255, 0.1) !important;
-    border-radius: 50% !important;
-    z-index: 100 !important;
-    display: flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-  }
 
   .back-btn {
     position: absolute !important;

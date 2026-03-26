@@ -1000,6 +1000,10 @@ const ptrSpinner = document.querySelector('.ptr-spinner');
 const appContainer = document.getElementById('app');
 
 window.addEventListener('touchstart', (e) => {
+    // Disable PTR if any modal is open
+    const isModalOpen = !entryModal.classList.contains('hidden') || !settingsModal.classList.contains('hidden');
+    if (isModalOpen) return;
+
     if (window.scrollY === 0) {
         touchStartPos = e.touches[0].pageY;
         if (appContainer) appContainer.style.transition = 'none';
@@ -1068,6 +1072,25 @@ initApp();
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
         // Register sw.js with a version query to force browser to check it
-        navigator.serviceWorker.register('./sw.js?v=15').catch(err => console.log(err));
+        navigator.serviceWorker.register('./sw.js?v=18').catch(err => console.log(err));
     });
 }
+
+// Ensure delete button is interactive
+document.addEventListener('DOMContentLoaded', () => {
+    const deleteBtn = document.getElementById('deleteEntry');
+    if (deleteBtn) {
+        deleteBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            const dateKey = selectedDate ? getDateKey(selectedDate) : null;
+            console.log('[JournAI] Delete button clicked', { selectedDate, dateKey });
+            
+            if (dateKey && deleteEntry(dateKey)) {
+                console.log('[JournAI] Entry deleted successfully');
+                closeModal();
+            } else if (!dateKey) {
+                console.error('[JournAI] Delete failed: No selectedDate');
+            }
+        });
+    }
+});
