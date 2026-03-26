@@ -15,33 +15,50 @@ function getEntries() {
 }
 
 function saveEntry(dateKey, text, mood, activity, health) {
-    const entries = getEntries();
-    entries[dateKey] = { text, mood, activity, health };
-    localStorage.setItem('journAI_entries', JSON.stringify(entries));
-    render();
-    checkTodayEntry();
-    
-    // Trigger cloud sync and backup
-    showSyncIndicator();
-    window.DriveService.syncData(entries).finally(() => hideSyncIndicator());
-    checkAndPerformBackup();
-    triggerAutomatedDocExport();
-}
-
-function deleteEntry(dateKey) {
-    const entries = getEntries();
-    if (confirm('Estas seguro de que deseas eliminar esta entrada?')) {
-        delete entries[dateKey];
+    try {
+        const entries = getEntries();
+        entries[dateKey] = { text, mood, activity, health };
         localStorage.setItem('journAI_entries', JSON.stringify(entries));
         render();
         checkTodayEntry();
         
-        // Trigger cloud sync and backup
-        showSyncIndicator();
-        window.DriveService.syncData(entries).finally(() => hideSyncIndicator());
+        // Trigger cloud sync and backup - non-blocking
+        if (window.DriveService) {
+            showSyncIndicator();
+            window.DriveService.syncData(entries)
+                .catch(err => console.error('[Sync] Failed:', err))
+                .finally(() => hideSyncIndicator());
+        }
+        
         checkAndPerformBackup();
         triggerAutomatedDocExport();
-        return true;
+    } catch (err) {
+        console.error('[Save] Local failed:', err);
+    }
+}
+
+function deleteEntry(dateKey) {
+    try {
+        const entries = getEntries();
+        if (confirm('¿Estás seguro de que deseas eliminar esta entrada?')) {
+            delete entries[dateKey];
+            localStorage.setItem('journAI_entries', JSON.stringify(entries));
+            render();
+            checkTodayEntry();
+            
+            if (window.DriveService) {
+                showSyncIndicator();
+                window.DriveService.syncData(entries)
+                    .catch(err => console.error('[Sync] Failed:', err))
+                    .finally(() => hideSyncIndicator());
+            }
+            
+            checkAndPerformBackup();
+            triggerAutomatedDocExport();
+            return true;
+        }
+    } catch (err) {
+        console.error('[Delete] failed:', err);
     }
     return false;
 }
@@ -905,11 +922,51 @@ window.addEventListener('keydown', (e) => {
     }
 });
 
-// Init
+// --- PULL TO REFRESH (MOBILE) ---
+let touchStartPos = 0;
+let pullDistance = 0;
+const PTR_THRESHOLD = 150;
+const ptrIndicator = document.getElementById('ptrIndicator');
+
+window.addEventListener('touchstart', (e) => {
+    if (window.scrollY === 0) {
+        touchStartPos = e.touches[0].pageY;
+    }
+}, { passive: true });
+
+window.addEventListener('touchmove', (e) => {
+    if (touchStartPos > 0 && window.scrollY === 0) {
+        const currentPos = e.touches[0].pageY;
+        pullDistance = currentPos - touchStartPos;
+        
+        if (pullDistance > 0) {
+            // Visual feedback
+            const progress = Math.min(pullDistance / PTR_THRESHOLD, 1);
+            if (ptrIndicator) {
+                ptrIndicator.style.transform = `scaleX(${progress})`;
+                if (progress >= 1) ptrIndicator.style.background = '#00ffcc';
+                else ptrIndicator.style.background = 'var(--accent-color)';
+            }
+        }
+    }
+}, { passive: true });
+
+window.addEventListener('touchend', () => {
+    if (pullDistance > PTR_THRESHOLD) {
+        if (ptrIndicator) ptrIndicator.style.height = '100vh'; // Flash effect
+        setTimeout(() => window.location.reload(), 100);
+    } else {
+        if (ptrIndicator) ptrIndicator.style.transform = 'scaleX(0)';
+    }
+    touchStartPos = 0;
+    pullDistance = 0;
+});
+
+// Initialize
 render();
+performStartupSync();
 checkTodayEntry();
-performStartupSync(); // Inter-device sync
-checkAndPerformBackup(); // Daily backup check
+checkAndPerformBackup();
 
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {

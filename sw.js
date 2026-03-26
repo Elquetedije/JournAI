@@ -1,11 +1,11 @@
-const CACHE_NAME = 'journai-v7';
+const CACHE_NAME = 'journai-v9';
 const ASSETS = [
     './',
     './index.html',
     './style.css',
     './app.js',
     './manifest.json',
-    './icon.png'
+    './icon-192.png'
 ];
 
 self.addEventListener('install', (e) => {
@@ -32,9 +32,18 @@ self.addEventListener('activate', (e) => {
 });
 
 self.addEventListener('fetch', (e) => {
+    // Network first, then cache
     e.respondWith(
-        caches.match(e.request).then((response) => {
-            return response || fetch(e.request);
+        fetch(e.request).then((response) => {
+            if (e.request.method === 'GET' && response.status === 200) {
+                const responseClone = response.clone();
+                caches.open(CACHE_NAME).then((cache) => {
+                    cache.put(e.request, responseClone);
+                });
+            }
+            return response;
+        }).catch(() => {
+            return caches.match(e.request);
         })
     );
 });
