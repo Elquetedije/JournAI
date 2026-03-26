@@ -146,6 +146,52 @@ async function triggerAutomatedDocExport() {
     await window.DriveService.performGoogleDocExport(dataByYear);
 }
 
+async function handleForceUpload() {
+    if (!confirm('¿Estás seguro de que quieres SOBRESCRIBIR la copia de la nube con tus datos locales actuales?')) return;
+    
+    showSyncIndicator();
+    updateSyncStatus('Subiendo datos locales a la nube...', 'syncing');
+    try {
+        const entries = getEntries();
+        const success = await window.DriveService.syncData(entries);
+        if (success) {
+            alert('¡Subida forzada completada con éxito!');
+            updateSyncStatus('Sincronización manual completada', 'success');
+        } else {
+            alert('Error al subir los datos.');
+            updateSyncStatus('Error en subida forzada', 'error');
+        }
+    } catch (err) {
+        console.error('[Sync] Force upload failed:', err);
+    } finally {
+        hideSyncIndicator();
+    }
+}
+
+async function handleForceDownload() {
+    if (!confirm('¿Estás seguro? Los datos locales serán REEMPLAZADOS por la versión de la nube.')) return;
+    
+    showSyncIndicator();
+    updateSyncStatus('Descargando datos de la nube...', 'syncing');
+    try {
+        const remoteEntries = await window.DriveService.getSyncData();
+        if (remoteEntries && Object.keys(remoteEntries).length > 0) {
+            localStorage.setItem('journAI_entries', JSON.stringify(remoteEntries));
+            render();
+            checkTodayEntry();
+            alert('¡Descarga forzada completada! Datos locales reemplazados.');
+            updateSyncStatus('Datos descargados de la nube', 'success');
+        } else {
+            alert('No se encontraron datos en la nube o el archivo está vacío.');
+        }
+    } catch (err) {
+        console.error('[Sync] Force download failed:', err);
+        alert('Error al descargar los datos de la nube.');
+    } finally {
+        hideSyncIndicator();
+    }
+}
+
 async function performStartupSync() {
     showSyncIndicator();
     console.log('[JournAI] performStartupSync started (Replacement Mode)');
@@ -908,6 +954,13 @@ if (downloadBackupBtn) downloadBackupBtn.addEventListener('click', () => {
     a.download = `journai_backup.json`;
     a.click();
 });
+
+// Attach manual sync buttons
+const forceUploadBtn = document.getElementById('forceUploadBtn');
+if (forceUploadBtn) forceUploadBtn.addEventListener('click', handleForceUpload);
+
+const forceDownloadBtn = document.getElementById('forceDownloadBtn');
+if (forceDownloadBtn) forceDownloadBtn.addEventListener('click', handleForceDownload);
 
 const uploadBackupBtn = document.getElementById('uploadBackupBtn');
 const importFile = document.getElementById('importFile');
