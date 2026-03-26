@@ -148,17 +148,23 @@ async function triggerAutomatedDocExport() {
 
 async function performStartupSync() {
     showSyncIndicator();
+    console.log('[JournAI] performStartupSync started');
     updateSyncStatus('Sincronizando datos de otros dispositivos...', 'syncing');
     try {
         const remoteEntries = await window.DriveService.getSyncData();
-        if (remoteEntries) {
+        if (remoteEntries && Object.keys(remoteEntries).length > 0) {
             const localEntries = getEntries();
+            console.log(`[JournAI] Merging local (${Object.keys(localEntries).length}) with remote (${Object.keys(remoteEntries).length})`);
             const mergedEntries = { ...localEntries, ...remoteEntries };
             localStorage.setItem('journAI_entries', JSON.stringify(mergedEntries));
             console.log('[JournAI] Startup sync completed');
             render();
             checkTodayEntry();
+        } else {
+            console.log('[JournAI] No remote data to import');
         }
+    } catch (err) {
+        console.error('[JournAI] Startup sync failed:', err);
     } finally {
         hideSyncIndicator();
     }
@@ -828,10 +834,22 @@ if (skipMoodBtn) skipMoodBtn.addEventListener('click', () => {
     }
 });
 
-const deleteEntryBtn = document.getElementById('deleteEntry');
-if (deleteEntryBtn) deleteEntryBtn.addEventListener('click', () => {
-    if (selectedDate && deleteEntry(getDateKey(selectedDate))) {
-        closeModal();
+document.addEventListener('DOMContentLoaded', () => {
+    const deleteEntryBtn = document.getElementById('deleteEntry');
+    if (deleteEntryBtn) {
+        console.log('[JournAI] Delete button found, attaching listener');
+        deleteEntryBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            const dateKey = selectedDate ? getDateKey(selectedDate) : null;
+            console.log('[JournAI] Delete button clicked', { selectedDate, dateKey });
+            
+            if (dateKey && deleteEntry(dateKey)) {
+                console.log('[JournAI] Entry deleted successfully');
+                closeModal();
+            } else if (!dateKey) {
+                console.error('[JournAI] Delete failed: No selectedDate');
+            }
+        });
     }
 });
 
@@ -927,10 +945,13 @@ let touchStartPos = 0;
 let pullDistance = 0;
 const PTR_THRESHOLD = 150;
 const ptrIndicator = document.getElementById('ptrIndicator');
+const ptrSpinner = document.querySelector('.ptr-spinner');
+const appContainer = document.getElementById('app');
 
 window.addEventListener('touchstart', (e) => {
     if (window.scrollY === 0) {
         touchStartPos = e.touches[0].pageY;
+        if (appContainer) appContainer.style.transition = 'none';
     }
 }, { passive: true });
 
@@ -940,12 +961,17 @@ window.addEventListener('touchmove', (e) => {
         pullDistance = currentPos - touchStartPos;
         
         if (pullDistance > 0) {
-            // Visual feedback
-            const progress = Math.min(pullDistance / PTR_THRESHOLD, 1);
+            // Physical pull effect with resistance
+            const dampedDistance = Math.min(pullDistance * 0.4, 100);
+            if (appContainer) appContainer.style.transform = `translateY(${dampedDistance}px)`;
+            
             if (ptrIndicator) {
-                ptrIndicator.style.transform = `scaleX(${progress})`;
-                if (progress >= 1) ptrIndicator.style.background = '#00ffcc';
-                else ptrIndicator.style.background = 'var(--accent-color)';
+                ptrIndicator.style.opacity = Math.min(pullDistance / 100, 1);
+                ptrIndicator.style.transform = `translateY(${Math.min(dampedDistance - 50, 0)}px)`;
+            }
+            
+            if (ptrSpinner) {
+                ptrSpinner.style.transform = `rotate(${pullDistance * 2}deg)`;
             }
         }
     }
@@ -953,20 +979,40 @@ window.addEventListener('touchmove', (e) => {
 
 window.addEventListener('touchend', () => {
     if (pullDistance > PTR_THRESHOLD) {
-        if (ptrIndicator) ptrIndicator.style.height = '100vh'; // Flash effect
-        setTimeout(() => window.location.reload(), 100);
+        // Refreshing state
+        if (appContainer) {
+            appContainer.style.transition = 'transform 0.3s cubic-bezier(0.23, 1, 0.32, 1)';
+            appContainer.style.transform = 'translateY(70px)';
+        }
+        if (ptrSpinner) ptrSpinner.style.animationPlayState = 'running';
+        
+        setTimeout(() => {
+            window.location.reload();
+        }, 800);
     } else {
-        if (ptrIndicator) ptrIndicator.style.transform = 'scaleX(0)';
+        // Reset
+        if (appContainer) {
+            appContainer.style.transition = 'transform 0.3s cubic-bezier(0.23, 1, 0.32, 1)';
+            appContainer.style.transform = 'translateY(0)';
+        }
+        if (ptrIndicator) {
+            ptrIndicator.style.opacity = '0';
+            ptrIndicator.style.transform = 'translateY(-50px)';
+        }
     }
     touchStartPos = 0;
     pullDistance = 0;
 });
 
-// Initialize
-render();
-performStartupSync();
-checkTodayEntry();
-checkAndPerformBackup();
+// Initialize in sequence
+async function initApp() {
+    render();
+    await performStartupSync();
+    checkTodayEntry();
+    checkAndPerformBackup();
+}
+
+initApp();
 
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {

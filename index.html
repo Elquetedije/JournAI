@@ -22,7 +22,11 @@
         <div class="stars-container"></div>
         <div class="stars-container fast"></div>
     </div>
-    <div class="ptr-indicator" id="ptrIndicator"></div>
+    <div class="ptr-indicator" id="ptrIndicator">
+        <div class="ptr-spinner-container">
+            <div class="ptr-spinner"></div>
+        </div>
+    </div>
 
     <div id="app">
         <aside class="sidebar glass-card">
@@ -128,10 +132,12 @@
         <!-- Entry Modal -->
         <div id="entryModal" class="modal-overlay hidden">
             <div class="entry-modal-view">
-                <button id="deleteEntry" class="delete-btn-premium hidden" title="Eliminar Entrada">🗑️</button>
+                <div class="modal-controls">
+                    <button id="deleteEntry" class="delete-btn-premium hidden" title="Eliminar Entrada">🗑️</button>
+                    <button class="close-btn" onclick="closeModal()" title="Cerrar">&times;</button>
+                </div>
                 <!-- Step 1: Text Input -->
                 <div id="step1" class="entry-step active">
-                    <button class="close-btn" onclick="closeModal()">&times;</button>
                     <section class="editor-main">
                         <header class="modal-header">
                             <h3 id="modalDateTitle">Mi Día</h3>
@@ -148,7 +154,6 @@
 
                 <!-- Step 2: Metrics Reflection -->
                 <div id="step2" class="entry-step">
-                    <button class="close-btn" onclick="closeModal()">&times;</button>
                     <div class="step2-header">
                         <button class="back-btn" id="prevStep">← Atrás</button>
                         <button id="skipMoodBtn" class="skip-btn-premium">Saltar →</button>

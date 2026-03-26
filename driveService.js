@@ -87,10 +87,12 @@ class DriveService {
 
     static async syncData(entries) {
         try {
+            console.log(`[DriveService] Syncing to cloud... Entries: ${Object.keys(entries || {}).length}`);
             const token = await this.getAccessToken();
             const folderId = await this.findOrCreateRecursiveFolder(token, 'JournAI Backups/Sincronizacion');
             const content = JSON.stringify(entries, null, 2);
-            await this.findOrCreateFile(token, 'sync_data.json', folderId, content);
+            const fileId = await this.findOrCreateFile(token, 'sync_data.json', folderId, content);
+            console.log(`[DriveService] Sync upload successful. FolderID: ${folderId}, FileID: ${fileId}`);
             return true;
         } catch (e) {
             console.error('[DriveService] Sync Update Failed:', e);
@@ -104,13 +106,19 @@ class DriveService {
             const folderId = await this.findOrCreateRecursiveFolder(token, 'JournAI Backups/Sincronizacion');
             const fileId = await this.findFile(token, 'sync_data.json', 'application/json', folderId);
             
-            if (!fileId) return null;
-
-            const res = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`, {
+            if (!fileId) {
+                console.log(`[DriveService] No sync file found in folder: ${folderId}`);
+                return null;
+            }
+            
+            const cacheBust = Date.now();
+            const res = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media&cb=${cacheBust}`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
             if (!res.ok) throw new Error('Failed to fetch sync data');
-            return await res.json();
+            const data = await res.json();
+            console.log(`[DriveService] Sync downloaded. Entries: ${Object.keys(data || {}).length}, FolderID: ${folderId}, FileID: ${fileId}`);
+            return data;
         } catch (e) {
             console.error('[DriveService] Sync Download Failed:', e);
             return null;

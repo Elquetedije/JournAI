@@ -1,4 +1,4 @@
-const CACHE_NAME = 'journai-v9';
+const CACHE_NAME = 'journai-v11';
 const ASSETS = [
     './',
     './index.html',
@@ -32,7 +32,14 @@ self.addEventListener('activate', (e) => {
 });
 
 self.addEventListener('fetch', (e) => {
-    // Network first, then cache
+    const url = new URL(e.request.url);
+    
+    // Skip service worker for external APIs (Google Drive, Auth, etc)
+    if (url.origin !== self.location.origin) {
+        return;
+    }
+
+    // Network first, then cache for local assets
     e.respondWith(
         fetch(e.request).then((response) => {
             if (e.request.method === 'GET' && response.status === 200) {
