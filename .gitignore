@@ -4,5 +4,4 @@ node_modules/
 .DS_Store
 *.log
 .gemini/
-# config.js removed from ignore to allow deployment
-# config.js
+config.js
