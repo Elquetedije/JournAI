@@ -74,7 +74,12 @@ const syncNowBtn = document.getElementById('syncNowBtn');
 function updateSyncStatus(message, type = '') {
     if (!syncStatus) return;
     syncStatus.textContent = message;
-    syncStatus.className = 'sync-value ' + type;
+    
+    // Update status orb if it exists
+    const orb = document.getElementById('statusOrb');
+    if (orb) {
+        orb.className = 'status-orb ' + type;
+    }
 }
 
 async function handleSyncNow() {
@@ -898,7 +903,7 @@ function openModal(date) {
     const data = entry || { text: "", mood: 5, activity: 5, health: 5 };
     
     if (modalDateTitle) {
-        modalDateTitle.textContent = isToday ? "Mi Dia" : `Entrada: ${date.getDate()} ${monthNames[date.getMonth()]}`;
+        modalDateTitle.textContent = isToday ? "Mi Día" : `${date.getDate()} ${monthNames[date.getMonth()]}`;
     }
     
     if (entryText) entryText.value = data.text || "";
@@ -1083,9 +1088,13 @@ window.addEventListener('touchmove', (e) => {
             const dampedDistance = Math.min(pullDistance * 0.4, 100);
             
             // Transform main content and sidebar independently
+            // Transform main content
             if (mainContent) mainContent.style.transform = `translateY(${dampedDistance}px)`;
-            // Sidebar moves less to stay visible but show movement
-            if (sidebar) sidebar.style.transform = `translateY(${dampedDistance * 0.3}px)`;
+            
+            // Sidebar moves only if NOT in mobile mode (bottom bar)
+            if (sidebar && window.innerWidth > 768) {
+                sidebar.style.transform = `translateY(${dampedDistance * 0.3}px)`;
+            }
             
             if (ptrIndicator) {
                 ptrIndicator.style.opacity = Math.min(pullDistance / 100, 1);
@@ -1107,7 +1116,7 @@ window.addEventListener('touchend', () => {
             mainContent.style.transition = transition;
             mainContent.style.transform = 'translateY(70px)';
         }
-        if (sidebar) {
+        if (sidebar && window.innerWidth > 768) {
             sidebar.style.transition = transition;
             sidebar.style.transform = 'translateY(21px)'; // 70 * 0.3
         }

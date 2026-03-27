@@ -96,47 +96,103 @@
             <span class="icon">🖋️</span>
         </button>
 
-        <!-- Settings Modal -->
+        <!-- Settings Modal (Redesigned) -->
         <div id="settingsModal" class="modal hidden">
-            <div class="modal-content glass-card">
+            <div class="modal-content glass-card premium-settings">
                 <header class="modal-header">
-                    <h2>Centro de Datos</h2>
-                    <button id="closeSettings" class="close-btn">Esc para cerrar &times;</button>
+                    <div class="header-info">
+                        <span class="pre-title">Configuración</span>
+                        <h2>Centro de Control</h2>
+                    </div>
+                    <button id="closeSettings" class="close-btn-minimal" title="Cerrar Ajustes">
+                        <span class="close-icon">&times;</span>
+                    </button>
                 </header>
                 <div class="settings-body">
-                    <section class="settings-section">
-                        <h3>Gestión de Datos</h3>
-                        <p>Exporta tu diario en formato JSON para copias de seguridad o genera un documento estructurado para imprimir o guardar.</p>
-                        <div class="settings-actions">
-                            <button id="downloadBackup" class="secondary-btn">⬇️ Backup JSON</button>
-                            <button id="uploadBackupBtn" class="secondary-btn">⬆️ Restaurar JSON</button>
-                            <button id="exportDoc" class="primary-btn-outline">📄 Exportar a Documento</button>
-                            <input type="file" id="importFile" accept=".json" class="hidden">
-                        </div>
-                    </section>
-
-                    <section class="settings-section drive-sync-section">
-                        <h3>Sincronización Cloud</h3>
-                        <p>Tus datos se guardan automáticamente en tu carpeta personal <strong>JournAI Backups/Backup b</strong> en Google Drive cada 24 horas.</p>
-                        <div class="sync-status-card glass-card-dark">
-                            <div class="sync-info">
-                                <span class="sync-icon">☁️</span>
-                                <div class="sync-details">
-                                    <span class="sync-label">Estado de Sincronización</span>
-                                    <span id="syncStatus" class="sync-value">Listo para sincronizar</span>
+                    <div class="settings-grid">
+                        <!-- Section: Data Management -->
+                        <div class="settings-card glass-card-dark">
+                            <div class="card-header">
+                                <span class="card-icon">📁</span>
+                                <div class="card-title-group">
+                                    <h3>Gestión de Datos</h3>
+                                    <p>Tu información es solo tuya. Exporta o restaura tus entradas en cualquier momento.</p>
                                 </div>
                             </div>
-                            <div class="sync-actions-grid">
-                                <button id="forceUploadBtn" class="primary-btn-outline sync-btn-subida">
-                                    <span>☁️</span> Forzar Subida
-                                </button>
-                                <button id="forceDownloadBtn" class="primary-btn-outline sync-btn-descarga">
-                                    <span>📥</span> Forzar Descarga
+                            <div class="settings-actions">
+                                <div class="action-item">
+                                    <button id="downloadBackup" class="action-btn-premium">
+                                        <span class="btn-icon">⬇️</span>
+                                        <div class="btn-text">
+                                            <span class="btn-title">Backup JSON</span>
+                                            <span class="btn-desc">Copia de seguridad local</span>
+                                        </div>
+                                    </button>
+                                </div>
+                                <div class="action-item">
+                                    <button id="uploadBackupBtn" class="action-btn-premium">
+                                        <span class="btn-icon">⬆️</span>
+                                        <div class="btn-text">
+                                            <span class="btn-title">Restaurar JSON</span>
+                                            <span class="btn-desc">Importar archivo previo</span>
+                                        </div>
+                                    </button>
+                                </div>
+                                <div class="action-item full-width">
+                                    <button id="exportDoc" class="action-btn-premium highlight">
+                                        <span class="btn-icon">📄</span>
+                                        <div class="btn-text">
+                                            <span class="btn-title">Exportar Diario</span>
+                                            <span class="btn-desc">Generar documento para impresión</span>
+                                        </div>
+                                    </button>
+                                </div>
+                                <input type="file" id="importFile" accept=".json" class="hidden">
+                            </div>
+                        </div>
+
+                        <!-- Section: Cloud Sync -->
+                        <div class="settings-card glass-card-dark">
+                            <div class="card-header">
+                                <span class="card-icon">☁️</span>
+                                <div class="card-title-group">
+                                    <h3>Sincronización Cloud</h3>
+                                    <p>Tus datos se guardan automáticamente en tu carpeta personal de Google Drive cada 24 horas.</p>
+                                </div>
+                            </div>
+                            <div class="sync-dashboard">
+                                <div class="sync-status-indicator">
+                                    <div class="status-orb" id="statusOrb"></div>
+                                    <span id="syncStatus">Listo para sincronizar</span>
+                                </div>
+                                
+                                <div class="sync-controls-grid">
+                                    <button id="forceUploadBtn" class="sync-ctrl-btn upload">
+                                        <span class="ctrl-icon">📤</span>
+                                        <span class="ctrl-label">Forzar Subida</span>
+                                    </button>
+                                    <button id="forceDownloadBtn" class="sync-ctrl-btn download">
+                                        <span class="ctrl-icon">📥</span>
+                                        <span class="ctrl-label">Forzar Descarga</span>
+                                    </button>
+                                </div>
+                                
+                                <button id="syncNowBtn" class="sync-main-btn">
+                                    <span>Ejecutar Backup Diario Ahora</span>
+                                    <span class="shine"></span>
                                 </button>
                             </div>
-                            <button id="syncNowBtn" class="primary-btn" style="margin-top: 1rem; width: 100%;">Backup Diario Ahora</button>
                         </div>
-                    </section>
+
+                        <!-- Section: Info -->
+                        <div class="settings-card glass-card-dark info-card">
+                            <div class="app-version">
+                                <span class="v-label">JournAI</span>
+                                <span class="v-num">v1.2.5</span>
+                            </div>
+                            <p class="credits">Diseñado para navegantes estelares. Tus sueños, a salvo bajo las estrellas.</p>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
