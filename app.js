@@ -6,7 +6,7 @@ const monthNames = window.monthNames;
 
 let currentDate = new Date();
 let selectedDate = null;
-let activeFilter = 'mood';
+let activeFilter = 'average';
 let activeView = 'days';
 
 // State management (LocalStorage)
@@ -596,8 +596,36 @@ function updateSliderLabels() {
     activityValue.textContent = activitySlider.value;
     healthValue.textContent = healthSlider.value;
     
-    // Reactive Glow for Modal
-    const colors = getColorForValue(parseInt(moodSlider.value));
+    // Get colors for each specific metric
+    const moodCols = getColorForValue(parseInt(moodSlider.value));
+    const activityCols = getColorForValue(parseInt(activitySlider.value));
+    const healthCols = getColorForValue(parseInt(healthSlider.value));
+    
+    // Apply colors to the value indicators
+    if (moodValue) {
+        moodValue.style.background = moodCols.bg;
+        moodValue.style.borderColor = moodCols.border;
+        moodValue.style.boxShadow = `0 0 15px ${moodCols.glow}`;
+    }
+    if (activityValue) {
+        activityValue.style.background = activityCols.bg;
+        activityValue.style.borderColor = activityCols.border;
+        activityValue.style.boxShadow = `0 0 15px ${activityCols.glow}`;
+    }
+    if (healthValue) {
+        healthValue.style.background = healthCols.bg;
+        healthValue.style.borderColor = healthCols.border;
+        healthValue.style.boxShadow = `0 0 15px ${healthCols.glow}`;
+    }
+    
+    // Dynamic Slider Tracks
+    moodSlider.style.setProperty('--accent', moodCols.border);
+    activitySlider.style.setProperty('--accent', activityCols.border);
+    healthSlider.style.setProperty('--accent', healthCols.border);
+    
+    // Reactive Glow for Modal (Average of all metrics)
+    const avg = (parseInt(moodSlider.value) + parseInt(activitySlider.value) + parseInt(healthSlider.value)) / 3;
+    const colors = getColorForValue(avg);
     const modalContent = document.querySelector('#entryModal .entry-modal-view');
     if (modalContent) {
         modalContent.style.setProperty('--glow-color', colors.glow);
@@ -617,7 +645,23 @@ function getAverageMetric(year, month = null) {
     Object.keys(entries).forEach(key => {
         const [eYear, eMonth] = key.split('-').map(Number);
         if (eYear === year && (month === null || eMonth === month)) {
-            const val = entries[key][activeFilter];
+            let val;
+            if (activeFilter === 'average') {
+                const entry = entries[key];
+                const metrics = [];
+                if (entry.mood !== undefined && entry.mood !== null) metrics.push(entry.mood);
+                if (entry.activity !== undefined && entry.activity !== null) metrics.push(entry.activity);
+                if (entry.health !== undefined && entry.health !== null) metrics.push(entry.health);
+                
+                if (metrics.length > 0) {
+                    val = metrics.reduce((a, b) => a + b, 0) / metrics.length;
+                } else {
+                    val = null;
+                }
+            } else {
+                val = entries[key][activeFilter];
+            }
+            
             if (val !== undefined && val !== null) {
                 total += val;
                 count++;
@@ -678,7 +722,23 @@ function renderDays() {
         const dayDiv = createDayElement(i, new Date().toDateString() === date.toDateString() ? 'today' : '');
         
         if (entry) {
-            const colors = getColorForValue(entry[activeFilter]);
+            let val;
+            if (activeFilter === 'average') {
+                const metrics = [];
+                if (entry.mood !== undefined && entry.mood !== null) metrics.push(entry.mood);
+                if (entry.activity !== undefined && entry.activity !== null) metrics.push(entry.activity);
+                if (entry.health !== undefined && entry.health !== null) metrics.push(entry.health);
+                
+                if (metrics.length > 0) {
+                    val = metrics.reduce((a, b) => a + b, 0) / metrics.length;
+                } else {
+                    val = null;
+                }
+            } else {
+                val = entry[activeFilter];
+            }
+            
+            const colors = getColorForValue(val);
             if (colors) {
                 dayDiv.style.backgroundColor = colors.bg;
                 dayDiv.style.borderColor = colors.border;

@@ -211,23 +211,115 @@ class DriveService {
         return await res.json();
     }
 
+    static calculateAverages(entriesList) {
+        if (!entriesList || entriesList.length === 0) return { mood: 0, health: 0, activity: 0 };
+        const sums = entriesList.reduce((acc, e) => {
+            acc.mood += (Number(e.mood) || 0);
+            acc.health += (Number(e.health) || 0);
+            acc.activity += (Number(e.activity) || 0);
+            return acc;
+        }, { mood: 0, health: 0, activity: 0 });
+        const count = entriesList.length;
+        return {
+            mood: (sums.mood / count).toFixed(1),
+            health: (sums.health / count).toFixed(1),
+            activity: (sums.activity / count).toFixed(1)
+        };
+    }
+
     static async performGoogleDocExport(dataByYear) {
         try {
-            console.log('[DriveService] --- INICIANDO EXPORTACIÓN (Modo Reemplazo) ---');
+            console.log('[DriveService] --- INICIANDO EXPORTACIÓN ENRIQUECIDA ---');
             const token = await this.getAccessToken();
             const folderId = await this.findOrCreateRecursiveFolder(token, 'AI/Gems/Background til journal 2');
             const filename = 'Mi diario';
             
-            let docId = await this.findFile(token, filename, 'application/vnd.google-apps.document', folderId);
-            if (docId) {
-                console.log('[DriveService] Documento anterior encontrado, eliminando para reconstruir...');
-                await fetch(`https://www.googleapis.com/drive/v3/files/${docId}`, {
-                    method: 'DELETE',
-                    headers: { 'Authorization': `Bearer ${token}` }
+            // Flatten all entries for global averages
+            const allEntries = [];
+            Object.values(dataByYear).forEach(year => {
+                Object.values(year).forEach(month => {
+                    Object.values(month).forEach(entry => allEntries.push(entry));
                 });
+            });
+            const globalAvg = this.calculateAverages(allEntries);
+
+            let docId = await this.findFile(token, filename, 'application/vnd.google-apps.document', folderId);
+            if (!docId) {
+                docId = await this.createEmptyDoc(token, filename, folderId);
+                console.log('[DriveService] Documento nuevo creado.');
+            } else {
+                console.log('[DriveService] Documento existente encontrado. Reestructurando...');
+                const doc = await this.getDoc(token, docId);
+                if (!doc || !doc.tabs || doc.tabs.length === 0) {
+                    throw new Error('No se pudo leer la estructura del documento');
+                }
+
+                const firstTab = doc.tabs[0];
+                const firstTabId = firstTab.tabProperties.tabId;
+                const requests = [];
+
+                // 1. Renombrar la primera pestaña a "Introduccion"
+                requests.push({
+                    updateDocumentTabProperties: {
+                        tabProperties: { 
+                            tabId: firstTabId, 
+                            title: 'Introduccion' 
+                        },
+                        fields: 'title'
+                    }
+                });
+                
+                // 2. Limpieza completa: obtener el índice final real del contenido actual
+                const bodyContent = firstTab.documentTab?.body?.content || [];
+                const lastElement = bodyContent[bodyContent.length - 1];
+                const actualEndIndex = lastElement ? lastElement.endIndex : 2;
+
+                if (actualEndIndex > 1) {
+                    requests.push({
+                        deleteContentRange: { 
+                            range: { startIndex: 1, endIndex: actualEndIndex - 1, tabId: firstTabId } 
+                        }
+                    });
+                }
+                
+                const introText = `INTRODUCCIÓN AL DIARIO\n\n` +
+                    `Este documento es un registro cronológico automatizado de las vivencias del usuario. Está estructurado jerárquicamente por pestañas:\n` +
+                    `- Introducción: Resumen general y métricas globales.\n` +
+                    `- Años (Pestañas principales): Resumen anual.\n` +
+                    `- Meses (Subpestañas): Registros diarios detallados.\n\n` +
+                    `GUÍA PARA IA: Interpreta este diario como una evolución emocional y física. Las métricas del 1 al 10 indican el estado subjetivo del usuario en cada categoría.\n\n` +
+                    `MÉTRICAS GLOBALES (Media Histórica):\n` +
+                    `- Ánimo: ${globalAvg.mood}/10\n` +
+                    `- Salud: ${globalAvg.health}/10\n` +
+                    `- Actividad: ${globalAvg.activity}/10`;
+
+                requests.push({
+                    insertText: { 
+                        location: { index: 1, tabId: firstTabId }, 
+                        text: introText 
+                    }
+                });
+
+                // 2. Eliminar todas las demás pestañas
+                if (doc.tabs.length > 1) {
+                    doc.tabs.slice(1).forEach(tab => {
+                        const tabIdToDelete = tab.tabProperties?.tabId || tab.tabId;
+                        if (tabIdToDelete) {
+                            requests.push({ deleteTab: { tabId: tabIdToDelete } });
+                        }
+                    });
+                }
+
+                const clearRes = await fetch(`https://docs.googleapis.com/v1/documents/${docId}:batchUpdate`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ requests })
+                });
+                if (!clearRes.ok) {
+                    const err = await clearRes.json();
+                    throw new Error(`Sync Error (Clear): ${err.error?.message}`);
+                }
             }
-            docId = await this.createEmptyDoc(token, filename, folderId);
-            console.log('[DriveService] Documento nuevo creado.');
 
             const years = Object.keys(dataByYear).sort((a,b) => b - a);
             if (years.length === 0) return true;
@@ -265,14 +357,12 @@ class DriveService {
             const phase2Requests = [];
 
             years.forEach(year => {
-                const months = Object.keys(dataByYear[year]).sort((a,b) => b - a);
-                months.forEach(month => {
-                    const monthName = window.monthNames[month];
+                Object.keys(dataByYear[year]).sort((a,b) => b - a).forEach(month => {
                     monthOrder.push({ year, month });
                     phase2Requests.push({
                         addDocumentTab: {
                             tabProperties: {
-                                title: monthName,
+                                title: window.monthNames[month],
                                 parentTabId: yearToTabId[year]
                             }
                         }
@@ -304,18 +394,31 @@ class DriveService {
             const phase3Requests = [];
             
             years.forEach(year => {
+                const yearEntries = [];
+                Object.values(dataByYear[year]).forEach(m => Object.values(m).forEach(e => yearEntries.push(e)));
+                const yearAvg = this.calculateAverages(yearEntries);
+                phase3Requests.push({
+                    insertText: { 
+                        location: { index: 1, tabId: yearToTabId[year] }, 
+                        text: `RESUMEN ANUAL ${year}\n\nMedias del año:\n- Ánimo: ${yearAvg.mood}/10\n- Salud: ${yearAvg.health}/10\n- Actividad: ${yearAvg.activity}/10\n\n` 
+                    }
+                });
+
                 Object.keys(dataByYear[year]).sort((a,b) => b - a).forEach(month => {
                     const tabId = monthToTabId[`${year}-${month}`];
-                    const monthName = window.monthNames[month];
-                    let text = `${monthName.toUpperCase()} ${year}\n\n`;
+                    const monthEntries = Object.values(dataByYear[year][month]);
+                    const monthAvg = this.calculateAverages(monthEntries);
+                    
+                    let text = `RESUMEN DE ${window.monthNames[month].toUpperCase()} ${year}\n` +
+                               `Medias: Ánimo ${monthAvg.mood} | Salud ${monthAvg.health} | Actividad ${monthAvg.activity}\n` +
+                               `----------------------------------------------------------------\n\n`;
+
                     Object.keys(dataByYear[year][month]).sort((a,b) => b - a).forEach(day => {
-                        const entry = dataByYear[year][month][day];
-                        text += `[${day}/${parseInt(month)+1}/${year}] Mood: ${entry.mood}\n${entry.text}\n\n`;
+                        const e = dataByYear[year][month][day];
+                        text += `[${day}/${parseInt(month)+1}/${year}] Ánimo: ${e.mood} | Salud: ${e.health} | Actividad: ${e.activity}\n${e.text}\n\n`;
                     });
 
-                    phase3Requests.push({
-                        insertText: { location: { tabId: tabId, index: 1 }, text: text }
-                    });
+                    phase3Requests.push({ insertText: { location: { index: 1, tabId: tabId }, text: text } });
                 });
             });
 
@@ -326,12 +429,12 @@ class DriveService {
             });
 
             if (res3.ok) {
-                console.log('[DriveService] Exportación con Subpestañas Completada.');
+                console.log('[DriveService] Exportación Enriquecida Completada.');
                 return true;
             }
             return false;
         } catch (e) {
-            console.error('[DriveService] Fallo Crítico:', e.message);
+            console.error('[DriveService] Error en Exportación Enriquecida:', e.message);
             return false;
         }
     }
@@ -385,8 +488,8 @@ class DriveService {
             });
 
             const requests = [
-                // Clear existing
-                { deleteContentRange: { range: { startIndex: 1, endIndex: Math.max(2, endIndex - 1) } } },
+                // Clear existing content if the document is not empty
+                ...(endIndex > 1 ? [{ deleteContentRange: { range: { startIndex: 1, endIndex: endIndex } } }] : []),
                 // Insert new text
                 { insertText: { location: { index: 1 }, text: fullText } },
                 // Apply styles
