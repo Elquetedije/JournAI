@@ -1057,7 +1057,8 @@ let pullDistance = 0;
 const PTR_THRESHOLD = 150;
 const ptrIndicator = document.getElementById('ptrIndicator');
 const ptrSpinner = document.querySelector('.ptr-spinner');
-const appContainer = document.getElementById('app');
+const mainContent = document.querySelector('.main-content');
+const sidebar = document.querySelector('.sidebar');
 
 window.addEventListener('touchstart', (e) => {
     // Disable PTR if any modal is open
@@ -1066,7 +1067,9 @@ window.addEventListener('touchstart', (e) => {
 
     if (window.scrollY === 0) {
         touchStartPos = e.touches[0].pageY;
-        if (appContainer) appContainer.style.transition = 'none';
+        // Disable transitions during pull
+        if (mainContent) mainContent.style.transition = 'none';
+        if (sidebar) sidebar.style.transition = 'none';
     }
 }, { passive: true });
 
@@ -1078,7 +1081,11 @@ window.addEventListener('touchmove', (e) => {
         if (pullDistance > 0) {
             // Physical pull effect with resistance
             const dampedDistance = Math.min(pullDistance * 0.4, 100);
-            if (appContainer) appContainer.style.transform = `translateY(${dampedDistance}px)`;
+            
+            // Transform main content and sidebar independently
+            if (mainContent) mainContent.style.transform = `translateY(${dampedDistance}px)`;
+            // Sidebar moves less to stay visible but show movement
+            if (sidebar) sidebar.style.transform = `translateY(${dampedDistance * 0.3}px)`;
             
             if (ptrIndicator) {
                 ptrIndicator.style.opacity = Math.min(pullDistance / 100, 1);
@@ -1095,9 +1102,14 @@ window.addEventListener('touchmove', (e) => {
 window.addEventListener('touchend', () => {
     if (pullDistance > PTR_THRESHOLD) {
         // Refreshing state
-        if (appContainer) {
-            appContainer.style.transition = 'transform 0.3s cubic-bezier(0.23, 1, 0.32, 1)';
-            appContainer.style.transform = 'translateY(70px)';
+        const transition = 'transform 0.4s cubic-bezier(0.23, 1, 0.32, 1)';
+        if (mainContent) {
+            mainContent.style.transition = transition;
+            mainContent.style.transform = 'translateY(70px)';
+        }
+        if (sidebar) {
+            sidebar.style.transition = transition;
+            sidebar.style.transform = 'translateY(21px)'; // 70 * 0.3
         }
         if (ptrSpinner) ptrSpinner.style.animationPlayState = 'running';
         
@@ -1106,9 +1118,14 @@ window.addEventListener('touchend', () => {
         }, 800);
     } else {
         // Reset
-        if (appContainer) {
-            appContainer.style.transition = 'transform 0.3s cubic-bezier(0.23, 1, 0.32, 1)';
-            appContainer.style.transform = 'translateY(0)';
+        const transition = 'transform 0.3s cubic-bezier(0.23, 1, 0.32, 1)';
+        if (mainContent) {
+            mainContent.style.transition = transition;
+            mainContent.style.transform = 'translateY(0)';
+        }
+        if (sidebar) {
+            sidebar.style.transition = transition;
+            sidebar.style.transform = 'translateY(0)';
         }
         if (ptrIndicator) {
             ptrIndicator.style.opacity = '0';
@@ -1118,6 +1135,53 @@ window.addEventListener('touchend', () => {
     touchStartPos = 0;
     pullDistance = 0;
 });
+
+// --- AI TEXT REFINEMENT ---
+async function refineTextWithAI() {
+    const aiBtn = document.getElementById('aiFormatBtn');
+    const textArea = document.getElementById('entryText');
+    if (!aiBtn || !textArea || !textArea.value.trim()) return;
+
+    const originalText = textArea.value;
+    const apiKey = window.CONFIG?.GEMINI_API_KEY;
+    
+    if (!apiKey) {
+        alert('API Key de Gemini no configurada.');
+        return;
+    }
+
+    try {
+        aiBtn.disabled = true;
+        aiBtn.classList.add('loading');
+        
+        // Using the user-specified model gemini-3.1-flash-lite-preview
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent?key=${apiKey}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                contents: [{
+                    parts: [{
+                        text: `Refina el siguiente texto de un diario. Elimina muletillas y redundancias, y mejora la separación mediante puntos, comas y párrafos. NO cambies el significado ni el contenido bajo ningún concepto. Devuelve SOLO el texto refinado, sin comentarios ni explicaciones adicionales: \n\n${originalText}`
+                    }]
+                }]
+            })
+        });
+
+        const data = await response.json();
+        if (data.candidates && data.candidates[0].content.parts[0].text) {
+            textArea.value = data.candidates[0].content.parts[0].text.trim();
+        } else {
+            console.error('[AI] Invalid response format', data);
+            alert('No se pudo refinar el texto.');
+        }
+    } catch (err) {
+        console.error('[AI] Error:', err);
+        alert('Error al conectar con el servicio de IA.');
+    } finally {
+        aiBtn.disabled = false;
+        aiBtn.classList.remove('loading');
+    }
+}
 
 // Initialize in sequence
 async function initApp() {
@@ -1136,21 +1200,9 @@ if ('serviceWorker' in navigator) {
     });
 }
 
-// Ensure delete button is interactive
+// Global Event Listeners
 document.addEventListener('DOMContentLoaded', () => {
-    const deleteBtn = document.getElementById('deleteEntry');
-    if (deleteBtn) {
-        deleteBtn.addEventListener('click', (e) => {
-            e.preventDefault();
-            const dateKey = selectedDate ? getDateKey(selectedDate) : null;
-            console.log('[JournAI] Delete button clicked', { selectedDate, dateKey });
-            
-            if (dateKey && deleteEntry(dateKey)) {
-                console.log('[JournAI] Entry deleted successfully');
-                closeModal();
-            } else if (!dateKey) {
-                console.error('[JournAI] Delete failed: No selectedDate');
-            }
-        });
-    }
+    // Other listeners already initialized at top-level or other DOMContentLoaded blocks
+    const aiBtn = document.getElementById('aiFormatBtn');
+    if (aiBtn) aiBtn.addEventListener('click', refineTextWithAI);
 });

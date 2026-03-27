@@ -31,8 +31,10 @@ html, body {
 }
 
 #app {
-  transition: transform 0.3s cubic-bezier(0.23, 1, 0.32, 1);
-  will-change: transform;
+  display: flex;
+  flex-direction: row; /* Horizontal layout for sidebar */
+  height: 100vh;
+  width: 100%;
 }
 
 * {
@@ -54,13 +56,6 @@ body {
   display: none !important;
 }
 
-#app {
-  display: flex;
-  flex-direction: row; /* Horizontal layout for sidebar */
-  height: 100vh;
-  width: 100%;
-}
-
 .sidebar {
   width: 260px;
   height: 100%;
@@ -74,6 +69,7 @@ body {
   background: rgba(10, 10, 12, 0.6);
   padding: 2rem 1.5rem;
   z-index: 20;
+  will-change: transform;
 }
 
 .sidebar-header {
@@ -199,6 +195,7 @@ body {
   flex-direction: column;
   height: 100vh;
   overflow: hidden;
+  will-change: transform;
 }
 
 /* Premium Starry & Nebula Background */
@@ -818,10 +815,54 @@ body {
   align-items: center;
 }
 
+.header-title-group {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
 .modal-header h3 {
   font-size: 1.8rem;
   font-weight: 700;
   letter-spacing: -0.02em;
+}
+
+.ai-format-btn {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: var(--text-primary);
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: var(--transition-smooth);
+  font-size: 1.2rem;
+}
+
+.ai-format-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: var(--accent-color);
+  transform: scale(1.1) rotate(10deg);
+  box-shadow: 0 0 15px rgba(59, 130, 246, 0.3);
+}
+
+.ai-format-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.ai-format-btn.loading {
+  animation: ai-spin 1.5s linear infinite;
+}
+
+@keyframes ai-spin {
+  0% { transform: rotate(0deg) scale(1); }
+  50% { transform: rotate(180deg) scale(1.2); }
+  100% { transform: rotate(360deg) scale(1); }
 }
 
 #entryText {
