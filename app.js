@@ -1116,36 +1116,36 @@ window.addEventListener('touchend', () => {
             mainContent.style.transition = transition;
             mainContent.style.transform = 'translateY(70px)';
         }
+        if (sidebar && window.innerWidth > 768) {
+            sidebar.style.transition = transition;
+            sidebar.style.transform = 'translateY(21px)'; // 70 * 0.3
+        }
         if (ptrSpinner) ptrSpinner.style.animationPlayState = 'running';
         
         setTimeout(() => {
-            // Reset transforms before reload to prevent layout drift on slow connections
-            if (mainContent) mainContent.style.transform = 'translateY(0)';
-            if (sidebar) sidebar.style.transform = 'none';
-            if (ptrIndicator) ptrIndicator.style.opacity = '0';
-            
-            // Hard reload to bypass potential stale cache
-            window.location.reload(true);
+            window.location.reload();
         }, 800);
     } else {
         // Reset
         const transition = 'transform 0.3s cubic-bezier(0.23, 1, 0.32, 1)';
         if (mainContent) {
             mainContent.style.transition = transition;
-            mainContent.style.transform = 'translateY(0)';
+            mainContent.style.transform = ''; // Clear inline style
         }
         if (sidebar) {
             sidebar.style.transition = transition;
-            if (window.innerWidth <= 768) {
-                sidebar.style.transform = 'none';
-            } else {
-                sidebar.style.transform = 'translateY(0)';
-            }
+            sidebar.style.transform = ''; // Clear inline style
         }
         if (ptrIndicator) {
             ptrIndicator.style.opacity = '0';
             ptrIndicator.style.transform = 'translateY(-50px)';
         }
+        
+        // Clean up transitions after they finish
+        setTimeout(() => {
+            if (mainContent) mainContent.style.transition = '';
+            if (sidebar) sidebar.style.transition = '';
+        }, 300);
     }
     touchStartPos = 0;
     pullDistance = 0;
