@@ -1346,37 +1346,27 @@ async function refineTextWithAI() {
 }
 
 async function handleGoogleDocImport() {
+    const fileInput = document.getElementById('importDocFile');
+    if (fileInput) fileInput.click();
+}
+
+async function processAIImport(text) {
     const importBtn = document.getElementById('importDocBtn');
-    if (!importBtn) return;
-
-    let docInput = prompt('Pega la URL o el ID del Google Doc que contiene tu diario antiguo:');
-    if (!docInput) return;
-
-    // Extract ID from URL if necessary
-    let fileId = docInput;
-    const match = docInput.match(/\/d\/([a-zA-Z0-9-_]+)/);
-    if (match) fileId = match[1];
-
     const apiKey = window.CONFIG?.GEMINI_API_KEY;
+    
     if (!apiKey) {
         alert('API Key de Gemini no configurada.');
         return;
     }
 
     try {
-        importBtn.disabled = true;
-        importBtn.querySelector('.btn-title').textContent = 'Procesando con IA...';
-        updateSyncStatus('Importando desde Google Doc...', 'syncing');
-
-        // 1. Get Text from Doc
-        const docText = await window.DriveService.exportDocAsText(fileId);
-        if (!docText || docText.length < 10) {
-            throw new Error('El documento parece estar vacío o no se pudo leer.');
+        if (importBtn) {
+            importBtn.disabled = true;
+            importBtn.querySelector('.btn-title').textContent = 'Procesando con IA...';
         }
+        updateSyncStatus('Importando y procesando con IA...', 'syncing');
 
-        // 2. Send to Gemini for parsing
-        // We limit text to ~50k characters to stay within reasonable limits for a single call
-        const truncatedText = docText.substring(0, 100000); 
+        const truncatedText = text.substring(0, 100000); 
         
         const promptText = `Analiza el siguiente texto de un diario personal. Extrae cada entrada diaria identificando su fecha. 
         Formato de salida requerido: Un objeto JSON puro donde las claves sean las fechas en formato 'YYYY-MM-DD' y los valores sean el texto de la entrada correspondiente.
@@ -1402,7 +1392,6 @@ async function handleGoogleDocImport() {
         
         try {
             const rawText = data.candidates[0].content.parts[0].text;
-            // Clean markdown if present
             const jsonMatch = rawText.match(/\{[\s\S]*\}/);
             aiExtracted = JSON.parse(jsonMatch ? jsonMatch[0] : rawText);
         } catch (e) {
@@ -1410,16 +1399,13 @@ async function handleGoogleDocImport() {
             throw new Error('La IA no devolvió un formato válido. Inténtalo de nuevo.');
         }
 
-        // 3. Merging logic
         const currentEntries = getEntries();
         let importedCount = 0;
         let skippedCount = 0;
 
-        for (const [dateStr, text] of Object.entries(aiExtracted)) {
-            // Validate date key format YYYY-MM-DD
+        for (const [dateStr, textEntry] of Object.entries(aiExtracted)) {
             const dateParts = dateStr.split('-');
             if (dateParts.length === 3) {
-                // Adjust to app format: YYYY-M-D (Month is 0-indexed in our app logic)
                 const year = parseInt(dateParts[0]);
                 const month = parseInt(dateParts[1]) - 1;
                 const day = parseInt(dateParts[2]);
@@ -1427,7 +1413,7 @@ async function handleGoogleDocImport() {
 
                 if (!currentEntries[normalizedKey]) {
                     currentEntries[normalizedKey] = {
-                        text: text.trim(),
+                        text: textEntry.trim(),
                         mood: null,
                         activity: null,
                         health: null
@@ -1439,7 +1425,6 @@ async function handleGoogleDocImport() {
             }
         }
 
-        // 4. Save and Sync
         if (importedCount > 0) {
             localStorage.setItem('journAI_entries', JSON.stringify(currentEntries));
             render();
@@ -1449,7 +1434,7 @@ async function handleGoogleDocImport() {
             
             if (syncSuccess) {
                 alert(`¡Importación exitosa! Se han añadido ${importedCount} entradas nuevas. (${skippedCount} ya existían y fueron respetadas). Sincronización en la nube actualizada.`);
-                updateSyncStatus('Importación y Sindicación completadas', 'success');
+                updateSyncStatus('Importación y Sincronización completadas', 'success');
             } else {
                 alert(`Se han añadido ${importedCount} entradas localmente, pero falló la sincronización en la nube. Intenta sincronizar manualmente.`);
                 updateSyncStatus('Importación local completada (Error en nube)', 'error');
@@ -1464,8 +1449,52 @@ async function handleGoogleDocImport() {
         alert('Error en el proceso de importación: ' + err.message);
         updateSyncStatus('Error en importación', 'error');
     } finally {
-        importBtn.disabled = false;
-        importBtn.querySelector('.btn-title').textContent = 'Importar de Google Doc';
+        if (importBtn) {
+            importBtn.disabled = false;
+            importBtn.querySelector('.btn-title').textContent = 'Importar con IA';
+        }
+    }
+}
+
+async function handleDeleteAll() {
+    console.info('[JournAI] Delete all triggered');
+    const confirmMessage = '¿ESTÁS ABSOLUTAMENTE SEGURO? Esta acción es IRREVERSIBLE y eliminará TODAS las entradas de tu diario en este dispositivo y en la nube.';
+    
+    if (!confirm(confirmMessage)) {
+        console.info('[JournAI] Delete all cancelled');
+        return;
+    }
+
+    console.info('[JournAI] Proceeding with total deletion');
+
+    try {
+        updateSyncStatus('Eliminando datos...', 'syncing');
+        localStorage.removeItem('journAI_entries');
+        
+        // Refresh UI
+        render();
+        checkTodayEntry();
+        
+        // Sync with cloud (send empty object to wipe cloud file)
+        if (window.DriveService) {
+            showSyncIndicator();
+            const success = await window.DriveService.syncData({});
+            if (success) {
+                alert('Todo el diario ha sido eliminado con éxito de este dispositivo y de la nube.');
+                updateSyncStatus('Diario eliminado y sincronizado', 'success');
+            } else {
+                alert('Datos eliminados localmente, pero hubo un problema al limpiar la nube. Por favor, intenta sincronizar manualmente.');
+                updateSyncStatus('Eliminado local (Error en nube)', 'error');
+            }
+        } else {
+            alert('Todo el diario local ha sido eliminado.');
+            updateSyncStatus('Diario local eliminado', 'success');
+        }
+    } catch (err) {
+        console.error('[Delete All] Error:', err);
+        alert('Error al intentar eliminar los datos.');
+    } finally {
+        hideSyncIndicator();
     }
 }
 
@@ -1473,6 +1502,22 @@ async function handleGoogleDocImport() {
 document.addEventListener('DOMContentLoaded', () => {
     const importBtn = document.getElementById('importDocBtn');
     if (importBtn) importBtn.addEventListener('click', handleGoogleDocImport);
+
+    const deleteAllBtn = document.getElementById('deleteAllBtn');
+    if (deleteAllBtn) deleteAllBtn.addEventListener('click', handleDeleteAll);
+
+    const importDocFile = document.getElementById('importDocFile');
+    if (importDocFile) {
+        importDocFile.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                processAIImport(event.target.result);
+            };
+            reader.readAsText(file);
+        });
+    }
 });
 
 // Initialize in sequence
