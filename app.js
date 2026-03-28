@@ -1067,7 +1067,7 @@ const sidebar = document.querySelector('.sidebar');
 
 window.addEventListener('touchstart', (e) => {
     // Disable PTR if any modal is open
-    const isModalOpen = !entryModal.classList.contains('hidden') || !settingsModal.classList.contains('hidden');
+    const isModalOpen = document.querySelector('.modal:not(.hidden), .modal-overlay:not(.hidden)');
     if (isModalOpen) return;
 
     if (window.scrollY === 0) {
