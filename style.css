@@ -1509,8 +1509,10 @@ input[type="range"]::-webkit-slider-thumb {
     display: grid !important;
     grid-template-rows: 1fr 64px !important; /* Explicit stable rows */
     grid-template-columns: 100% !important;
-    height: 100dvh !important;
-    width: 100vw !important;
+    position: fixed !important; /* UI LOCK - Immobility guaranteed */
+    inset: 0 !important;       /* UI LOCK - Anchored to viewport */
+    height: 100% !important;
+    width: 100% !important;
     overflow: hidden !important;
     flex-direction: column !important;
   }
@@ -1783,20 +1785,33 @@ input[type="range"]::-webkit-slider-thumb {
   /* PTR Feedback */
   .ptr-indicator {
     position: fixed;
-    top: 20px;
+    top: 0px; 
     left: 50%;
-    transform: translateX(-50%) translateY(-100px); /* Hidden by default above screen */
-    background: rgba(255, 255, 255, 0.95);
-    width: 44px;
-    height: 44px;
+    transform: translateX(-50%) translateY(-100px); /* Well above the screen */
+    background: rgba(10, 10, 15, 0.85);
+    backdrop-filter: blur(10px);
+    width: 50px;
+    height: 50px;
     border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+    border: 1px solid rgba(59, 130, 246, 0.3);
+    box-shadow: 0 0 20px rgba(59, 130, 246, 0.2);
     z-index: 10000;
     opacity: 0;
+    pointer-events: none;
     transition: transform 0.3s cubic-bezier(0.23, 1, 0.32, 1), opacity 0.3s ease;
+  }
+
+  .ptr-spinner {
+    width: 24px;
+    height: 24px;
+    border: 3px solid rgba(255, 255, 255, 0.1);
+    border-top: 3.5px solid var(--accent-color);
+    border-radius: 50%;
+    animation: spin 1s infinite linear;
+    animation-play-state: paused;
   }
 
   .ptr-spinner-container {

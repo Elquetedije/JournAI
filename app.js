@@ -1076,7 +1076,7 @@ window.addEventListener('touchstart', (e) => {
         if (mainContent) mainContent.style.transition = 'none';
         if (sidebar) sidebar.style.transition = 'none';
     }
-}, { passive: true });
+}, { passive: false });
 
 window.addEventListener('touchmove', (e) => {
     if (touchStartPos > 0 && window.scrollY === 0) {
@@ -1084,37 +1084,43 @@ window.addEventListener('touchmove', (e) => {
         pullDistance = currentPos - touchStartPos;
         
         if (pullDistance > 0) {
-            // Visual indicator only - NO layout displacement
-            const dampedDistance = Math.min(pullDistance * 0.4, 100);
+            // CRITICAL: Block the browser's default bounce/rubber-banding to keep UI fixed
+            if (e.cancelable) e.preventDefault();
+
+            // Visual feedback - Indicator displacement only
+            const dampedDistance = Math.min(pullDistance * 0.4, 120);
             
             if (ptrIndicator) {
                 ptrIndicator.style.transition = 'none';
                 ptrIndicator.style.opacity = Math.min(pullDistance / 80, 1);
-                const yPos = Math.min(-100 + dampedDistance, 0);
+                // Animate ONLY the spinner indicator
+                const yPos = -100 + dampedDistance;
                 ptrIndicator.style.transform = `translateX(-50%) translateY(${yPos}px)`;
             }
             
             if (ptrSpinner) {
-                ptrSpinner.style.transform = `rotate(${pullDistance * 2}deg)`;
+                ptrSpinner.style.transform = `rotate(${pullDistance * 3}deg)`;
             }
         }
     }
-}, { passive: true });
+}, { passive: false });
 
-window.addEventListener('touchend', () => {
+window.addEventListener('touchend', (e) => {
     if (pullDistance > PTR_THRESHOLD) {
         // Refreshing state - hold indicator in place
         if (ptrIndicator) {
             ptrIndicator.style.transition = 'transform 0.3s cubic-bezier(0.23, 1, 0.32, 1), opacity 0.3s ease';
-            ptrIndicator.style.transform = 'translateX(-50%) translateY(0px)';
+            ptrIndicator.style.transform = 'translateX(-50%) translateY(20px)';
             ptrIndicator.style.opacity = '1';
         }
-        if (ptrSpinner) ptrSpinner.style.animationPlayState = 'running';
+        if (ptrSpinner) {
+            ptrSpinner.style.animationPlayState = 'running';
+        }
         
-        // Brief delay before reload
+        // Refresh after showing visual feedback
         setTimeout(() => {
             window.location.reload();
-        }, 600);
+        }, 500);
     } else {
         // Reset purely visual indicator
         if (ptrIndicator) {
@@ -1125,7 +1131,7 @@ window.addEventListener('touchend', () => {
     }
     touchStartPos = 0;
     pullDistance = 0;
-});
+}, { passive: false });
 
 // --- HIGHLIGHTS (DESTACADOS) LOGIC ---
 function calculateHighlights() {
