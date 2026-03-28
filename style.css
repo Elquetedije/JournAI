@@ -48,9 +48,8 @@ html, body {
 body {
   background: var(--bg-color);
   color: var(--text-primary);
-  height: 100dvh !important; /* Fixed viewport height */
+  height: 100dvh !important;
   overflow: hidden;
-  position: fixed; /* Lock body scrolling entirely to prevent layout jitter on mobile */
   width: 100%;
 }
 
@@ -1611,15 +1610,35 @@ input[type="range"]::-webkit-slider-thumb {
 
   /* Main Content Adjustments */
   .main-content {
-    flex: 1 !important;
-    height: 100% !important;
-    /* Space for the fixed bottom bar + 20px of safety margin to avoid overlap */
-    padding-bottom: calc(64px + env(safe-area-inset-bottom) + 20px) !important; 
-    width: 100% !important;
-    overflow: hidden;
     display: flex;
     flex-direction: column;
+    flex: 1 !important;
+    width: 100% !important;
+    overflow: hidden;
+    padding-bottom: calc(64px + env(safe-area-inset-bottom)) !important; 
     /* Static layout - Removed PTR margin/transform */
+  }
+
+  .calendar-container {
+    flex: 1 !important;
+    display: flex;
+    flex-direction: column;
+    padding: 0.5rem 1rem 12px 1rem !important;
+    min-height: 0; /* Important for flex shrink */
+  }
+
+  .calendar-grid {
+    flex: 1;
+    display: grid;
+    gap: 4px !important;
+    grid-template-columns: repeat(7, 1fr) !important;
+    grid-template-rows: repeat(6, 1fr) !important; /* Ensure 6 rows fit exactly */
+    align-content: stretch;
+  }
+
+  .day {
+    min-height: 0 !important; /* Allow shrinking */
+    aspect-ratio: auto !important; /* Flexible height on mobile to fit screen */
   }
 
   .glass-header {
