@@ -19,7 +19,7 @@
 }
 
 html, body {
-  overscroll-behavior-y: contain; /* Prevent native bounce while PTR is active */
+  overscroll-behavior-y: none !important; /* Disable native PTR in Chrome/Android */
 }
 
 /* Modal states - forced priority */
@@ -33,7 +33,7 @@ html, body {
 #app {
   display: flex;
   flex-direction: row; /* Horizontal layout for sidebar */
-  height: 100vh;
+  height: 100dvh !important; /* Fixed viewport height */
   width: 100%;
 }
 
@@ -48,8 +48,10 @@ html, body {
 body {
   background: var(--bg-color);
   color: var(--text-primary);
-  height: 100vh;
+  height: 100dvh !important; /* Fixed viewport height */
   overflow: hidden;
+  position: fixed; /* Lock body scrolling entirely to prevent layout jitter on mobile */
+  width: 100%;
 }
 
 .hidden {
@@ -1617,8 +1619,7 @@ input[type="range"]::-webkit-slider-thumb {
     overflow: hidden;
     display: flex;
     flex-direction: column;
-    margin-top: var(--ptr-margin, 0px) !important;
-    transition: var(--ptr-transition, none) !important;
+    /* Static layout - Removed PTR margin/transform */
   }
 
   .glass-header {
@@ -1746,18 +1747,20 @@ input[type="range"]::-webkit-slider-thumb {
   /* PTR Feedback */
   .ptr-indicator {
     position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100px;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%) translateY(-100px); /* Hidden by default above screen */
+    background: rgba(255, 255, 255, 0.95);
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
     display: flex;
-    justify-content: center;
     align-items: center;
-    z-index: 9999;
-    pointer-events: none;
+    justify-content: center;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+    z-index: 10000;
     opacity: 0;
-    transform: translateY(-40px);
-    transition: opacity 0.2s ease, transform 0.2s ease;
+    transition: transform 0.3s cubic-bezier(0.23, 1, 0.32, 1), opacity 0.3s ease;
   }
 
   .ptr-spinner-container {
