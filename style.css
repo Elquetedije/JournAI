@@ -1620,57 +1620,45 @@ input[type="range"]::-webkit-slider-thumb {
   }
 
   .glass-header {
-    height: 60px !important;
-    padding: 0 1rem !important;
-    flex-direction: row !important; /* Overriding previous mobile header which was column */
-  }
-
-  .calendar-nav {
-    gap: 1rem !important;
-    width: 100% !important;
-    justify-content: center !important;
-  }
-
-  .month-year-display {
-    font-size: 1.1rem !important;
-    min-width: 120px !important;
-  }
-
-  .nav-btn {
-    padding: 0.4rem 0.6rem !important;
+    height: 50px !important; /* Slightly smaller header on mobile */
+    padding: 0 0.8rem !important;
+    flex-direction: row !important;
   }
 
   .calendar-container {
-    padding: 0.5rem 1rem 1rem 1rem !important;
+    padding: 0.25rem 0.5rem 0.5rem 0.5rem !important;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    overflow: hidden;
   }
 
   .weekdays {
-    margin-bottom: 0.5rem !important;
-    display: grid; /* Removed !important to allow JS style.display = 'none' */
-  }
-
-  .weekdays span {
-    font-size: 0.65rem !important;
+    margin-bottom: 0.25rem !important;
+    display: grid;
   }
 
   .calendar-grid {
-    gap: 4px !important;
+    gap: 2px !important; /* Minimal gap on mobile */
     grid-template-columns: repeat(7, 1fr) !important;
+    flex: 1; /* Allow it to grow/shrink based on space */
+    min-height: 0;
   }
 
-  .calendar-grid.view-months, .calendar-grid.view-years {
-    grid-template-columns: repeat(3, 1fr) !important;
-    grid-template-rows: repeat(4, 1fr) !important;
+  .day {
+    min-height: auto !important; /* Fluid height based on aspect ratio */
+    aspect-ratio: 1/1 !important;
+    padding: 0.25rem !important;
   }
 
   .day .number {
-    font-size: 1rem !important;
+    font-size: 0.9rem !important;
   }
 
   .day .indicator {
-    bottom: 4px !important;
-    width: 4px !important;
-    height: 4px !important;
+    bottom: 2px !important;
+    width: 3px !important;
+    height: 3px !important;
   }
 
   /* FAB Positioning */

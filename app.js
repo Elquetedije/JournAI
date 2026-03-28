@@ -1116,14 +1116,16 @@ window.addEventListener('touchend', () => {
             mainContent.style.transition = transition;
             mainContent.style.transform = 'translateY(70px)';
         }
-        if (sidebar && window.innerWidth > 768) {
-            sidebar.style.transition = transition;
-            sidebar.style.transform = 'translateY(21px)'; // 70 * 0.3
-        }
         if (ptrSpinner) ptrSpinner.style.animationPlayState = 'running';
         
         setTimeout(() => {
-            window.location.reload();
+            // Reset transforms before reload to prevent layout drift on slow connections
+            if (mainContent) mainContent.style.transform = 'translateY(0)';
+            if (sidebar) sidebar.style.transform = 'none';
+            if (ptrIndicator) ptrIndicator.style.opacity = '0';
+            
+            // Hard reload to bypass potential stale cache
+            window.location.reload(true);
         }, 800);
     } else {
         // Reset
@@ -1134,7 +1136,6 @@ window.addEventListener('touchend', () => {
         }
         if (sidebar) {
             sidebar.style.transition = transition;
-            // On mobile, force transform to none to override any potential leaked styles
             if (window.innerWidth <= 768) {
                 sidebar.style.transform = 'none';
             } else {
