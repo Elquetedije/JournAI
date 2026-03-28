@@ -1507,15 +1507,27 @@ input[type="range"]::-webkit-slider-thumb {
 
   #app {
     display: grid !important;
-    grid-template-rows: 1fr auto !important;
+    grid-template-rows: 1fr 64px !important; /* Explicit stable rows */
+    grid-template-columns: 100% !important;
     height: 100dvh !important;
-    overflow: hidden;
-    flex-direction: column !important; /* Fallback for older browsers */
+    width: 100vw !important;
+    overflow: hidden !important;
+    flex-direction: column !important;
+  }
+
+  /* Stabilize floating elements inside Grid to avoid extra rows */
+  #app > .fab, 
+  #app > .modal, 
+  #app > .modal-overlay {
+    grid-row: 1 / span 2 !important;
+    grid-column: 1 !important;
+    z-index: 10000 !important;
   }
 
   /* Transform Sidebar into Bottom Bar - Re-pinned for Stability */
   .sidebar {
-    order: 2 !important; /* Move to the second row (bottom) */
+    grid-row: 2 !important; /* Explicitly fixed in row 2 */
+    order: 2 !important; 
     width: 100% !important;
     height: auto !important;
     min-height: 64px !important;
@@ -1611,7 +1623,8 @@ input[type="range"]::-webkit-slider-thumb {
 
   /* Main Content Adjustments */
   .main-content {
-    order: 1 !important; /* Stay in the first row (top) */
+    grid-row: 1 !important; /* Explicitly fixed in row 1 */
+    order: 1 !important; 
     display: flex;
     flex-direction: column;
     flex: 1 !important;
