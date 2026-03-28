@@ -218,7 +218,7 @@ class DriveService {
     }
 
     static calculateAverages(entriesList) {
-        if (!entriesList || entriesList.length === 0) return { mood: 0, health: 0, activity: 0 };
+        if (!entriesList || entriesList.length === 0) return { mood: 'null', health: 'null', activity: 'null' };
         const sums = entriesList.reduce((acc, e) => {
             acc.mood += (Number(e.mood) || 0);
             acc.health += (Number(e.health) || 0);
@@ -295,9 +295,9 @@ class DriveService {
                     `- Meses (Subpestañas): Registros diarios detallados.\n\n` +
                     `GUÍA PARA IA: Interpreta este diario como una evolución emocional y física. Las métricas del 1 al 10 indican el estado subjetivo del usuario en cada categoría.\n\n` +
                     `MÉTRICAS GLOBALES (Media Histórica):\n` +
-                    `- Ánimo: ${globalAvg.mood}/10\n` +
-                    `- Salud: ${globalAvg.health}/10\n` +
-                    `- Actividad: ${globalAvg.activity}/10`;
+                    `- Ánimo: ${globalAvg.mood === 'null' ? 'null' : globalAvg.mood + '/10'}\n` +
+                    `- Salud: ${globalAvg.health === 'null' ? 'null' : globalAvg.health + '/10'}\n` +
+                    `- Actividad: ${globalAvg.activity === 'null' ? 'null' : globalAvg.activity + '/10'}`;
 
                 requests.push({
                     insertText: { 
@@ -403,10 +403,14 @@ class DriveService {
                 const yearEntries = [];
                 Object.values(dataByYear[year]).forEach(m => Object.values(m).forEach(e => yearEntries.push(e)));
                 const yearAvg = this.calculateAverages(yearEntries);
+                const yearAvgText = `RESUMEN ANUAL ${year}\n\nMedias del año:\n` +
+                                   `- Ánimo: ${yearAvg.mood === 'null' ? 'null' : yearAvg.mood + '/10'}\n` +
+                                   `- Salud: ${yearAvg.health === 'null' ? 'null' : yearAvg.health + '/10'}\n` +
+                                   `- Actividad: ${yearAvg.activity === 'null' ? 'null' : yearAvg.activity + '/10'}\n\n`;
                 phase3Requests.push({
                     insertText: { 
                         location: { index: 1, tabId: yearToTabId[year] }, 
-                        text: `RESUMEN ANUAL ${year}\n\nMedias del año:\n- Ánimo: ${yearAvg.mood}/10\n- Salud: ${yearAvg.health}/10\n- Actividad: ${yearAvg.activity}/10\n\n` 
+                        text: yearAvgText
                     }
                 });
 
@@ -415,8 +419,12 @@ class DriveService {
                     const monthEntries = Object.values(dataByYear[year][month]);
                     const monthAvg = this.calculateAverages(monthEntries);
                     
+                    const mA = monthAvg.mood === 'null' ? 'null' : `${monthAvg.mood}/10`;
+                    const sA = monthAvg.health === 'null' ? 'null' : `${monthAvg.health}/10`;
+                    const aA = monthAvg.activity === 'null' ? 'null' : `${monthAvg.activity}/10`;
+
                     let text = `RESUMEN DE ${window.monthNames[month].toUpperCase()} ${year}\n` +
-                               `Medias: Ánimo ${monthAvg.mood} | Salud ${monthAvg.health} | Actividad ${monthAvg.activity}\n` +
+                               `Medias: Ánimo ${mA} | Salud ${sA} | Actividad ${aA}\n` +
                                `----------------------------------------------------------------\n\n`;
 
                     Object.keys(dataByYear[year][month]).sort((a,b) => b - a).forEach(day => {
