@@ -1369,13 +1369,12 @@ async function processAIImport(text) {
         const truncatedText = text.substring(0, 100000); 
         
         const promptText = `Analiza el siguiente texto de un diario personal. Extrae cada entrada diaria identificando su fecha. 
-        Formato de salida requerido: Un objeto JSON puro donde las claves sean las fechas en formato 'YYYY-MM-DD' y los valores sean el texto de la entrada correspondiente.
-        Reglas:
-        1. Si una entrada no tiene fecha clara, omítela o agrúpala con la fecha anterior si parece parte de ella.
-        2. Si hay varias entradas para el mismo día, únelas.
-        3. El texto está en Español.
+        Reglas Estrictas:
+        1. Devuelve un objeto JSON donde las claves sean las fechas en formato 'YYYY-MM-DD' y los valores el texto de la entrada.
+        2. IGNORA cualquier fragmento de texto que NO esté claramente asociado a una fecha específica. No incluyas introducciones, ruidos de formato o notas sin fecha.
+        3. Si hay varias entradas para el mismo día, concaténalas en el mismo valor de texto.
         4. Reemplaza nombres de meses por números correctamente (Enero -> 01, etc.).
-        5. Devuelve ÚNICAMENTE el JSON crudo, sin bloques de código markdown ni texto adicional.
+        5. Devuelve ÚNICAMENTE el JSON crudo.
 
         Texto del diario:\n\n${truncatedText}`;
 
@@ -1383,7 +1382,10 @@ async function processAIImport(text) {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                contents: [{ parts: [{ text: promptText }] }]
+                contents: [{ parts: [{ text: promptText }] }],
+                generationConfig: {
+                    response_mime_type: "application/json"
+                }
             })
         });
 
@@ -1392,8 +1394,8 @@ async function processAIImport(text) {
         
         try {
             const rawText = data.candidates[0].content.parts[0].text;
-            const jsonMatch = rawText.match(/\{[\s\S]*\}/);
-            aiExtracted = JSON.parse(jsonMatch ? jsonMatch[0] : rawText);
+            // Al usar response_mime_type: application/json, la respuesta es JSON puro
+            aiExtracted = JSON.parse(rawText);
         } catch (e) {
             console.error('[AI Import] Parsing failed:', e, data);
             throw new Error('La IA no devolvió un formato válido. Inténtalo de nuevo.');
