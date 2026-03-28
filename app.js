@@ -1150,6 +1150,171 @@ window.addEventListener('touchend', () => {
     pullDistance = 0;
 });
 
+// --- HIGHLIGHTS (DESTACADOS) LOGIC ---
+function calculateHighlights() {
+    const entries = getEntries();
+    const highlights = {
+        best: { dateKey: null, val: -Infinity, label: 'Mejor Día', icon: '🏆', desc: 'Media más alta' },
+        worst: { dateKey: null, val: Infinity, label: 'Día Difícil', icon: '🌑', desc: 'Media más baja' },
+        maxMood: { dateKey: null, val: -Infinity, label: 'Día Más Feliz', icon: '😊', desc: 'Ánimo máximo' },
+        minMood: { dateKey: null, val: Infinity, label: 'Día Más Triste', icon: '😢', desc: 'Ánimo mínimo' },
+        maxHealth: { dateKey: null, val: -Infinity, label: 'Más Saludable', icon: '🍏', desc: 'Salud máxima' },
+        minHealth: { dateKey: null, val: Infinity, label: 'Menos Saludable', icon: '🤒', desc: 'Salud mínima' },
+        maxActivity: { dateKey: null, val: -Infinity, label: 'Máxima Actividad', icon: '⚡', desc: 'Actividad máxima' },
+        minActivity: { dateKey: null, val: Infinity, label: 'Mínima Actividad', icon: '🧘', desc: 'Actividad mínima' }
+    };
+
+    let hasData = false;
+
+    for (const [dateKey, entry] of Object.entries(entries)) {
+        if (entry.mood === null || entry.activity === null || entry.health === null) continue;
+        
+        hasData = true;
+        const avg = (entry.mood + entry.activity + entry.health) / 3;
+
+        // Better/Worst Day
+        if (avg > highlights.best.val) { highlights.best.val = avg; highlights.best.dateKey = dateKey; }
+        if (avg < highlights.worst.val) { highlights.worst.val = avg; highlights.worst.dateKey = dateKey; }
+
+        // Mood
+        if (entry.mood > highlights.maxMood.val) { highlights.maxMood.val = entry.mood; highlights.maxMood.dateKey = dateKey; }
+        if (entry.mood < highlights.minMood.val) { highlights.minMood.val = entry.mood; highlights.minMood.dateKey = dateKey; }
+
+        // Health
+        if (entry.health > highlights.maxHealth.val) { highlights.maxHealth.val = entry.health; highlights.maxHealth.dateKey = dateKey; }
+        if (entry.health < highlights.minHealth.val) { highlights.minHealth.val = entry.health; highlights.minHealth.dateKey = dateKey; }
+
+        // Activity
+        if (entry.activity > highlights.maxActivity.val) { highlights.maxActivity.val = entry.activity; highlights.maxActivity.dateKey = dateKey; }
+        if (entry.activity < highlights.minActivity.val) { highlights.minActivity.val = entry.activity; highlights.minActivity.dateKey = dateKey; }
+    }
+
+    return hasData ? highlights : null;
+}
+
+function renderHighlights() {
+    const grid = document.getElementById('highlightsGrid');
+    if (!grid) return;
+    
+    const highlights = calculateHighlights();
+    
+    if (!highlights) {
+        grid.innerHTML = `<div class="info-card" style="grid-column: 1/-1; padding: 3rem;">
+            <p>Aún no tienes suficientes datos con métricas para generar destacados. ¡Sigue escribiendo!</p>
+        </div>`;
+        return;
+    }
+
+    grid.innerHTML = '';
+    
+    Object.values(highlights).forEach(h => {
+        if (!h.dateKey) return;
+        
+        const [y, m, d] = h.dateKey.split('-').map(Number);
+        const dateObj = new Date(y, m, d);
+        const dateStr = `${d} ${monthNames[m]} ${y}`;
+        
+        const card = document.createElement('div');
+        card.className = 'highlight-card';
+        card.innerHTML = `
+            <div class="h-header">
+                <div class="h-icon">${h.icon}</div>
+                <div class="h-info">
+                    <span class="h-label">${h.desc}</span>
+                    <span class="h-title">${h.label}</span>
+                </div>
+            </div>
+            <div class="h-meta">
+                <span class="h-date">${dateStr}</span>
+                <span class="h-value">${Number.isInteger(h.val) ? h.val : h.val.toFixed(1)}</span>
+            </div>
+        `;
+        
+        card.addEventListener('click', () => {
+            openModal(dateObj, true); // true = fromHighlights
+        });
+        
+        grid.appendChild(card);
+    });
+}
+
+function openHighlights() {
+    renderHighlights();
+    const modal = document.getElementById('highlightsModal');
+    if (modal) modal.classList.remove('hidden');
+}
+
+function closeHighlights() {
+    const modal = document.getElementById('highlightsModal');
+    if (modal) modal.classList.add('hidden');
+}
+
+// Global Event Listeners for Highlights
+document.addEventListener('DOMContentLoaded', () => {
+    const highlightsBtn = document.getElementById('highlightsBtn');
+    if (highlightsBtn) highlightsBtn.addEventListener('click', openHighlights);
+    
+    const closeHighlightsBtn = document.getElementById('closeHighlights');
+    if (closeHighlightsBtn) closeHighlightsBtn.addEventListener('click', closeHighlights);
+    
+    const backToHighlightsBtn = document.getElementById('backToHighlights');
+    if (backToHighlightsBtn) {
+        backToHighlightsBtn.addEventListener('click', () => {
+            closeModal();
+            openHighlights();
+        });
+    }
+});
+
+// Update openModal to support back navigation and read-only mode
+const originalOpenModal = openModal;
+openModal = function(date, fromHighlights = false) {
+    originalOpenModal(date);
+    
+    const modalOverlay = document.getElementById('entryModal');
+    const backBtn = document.getElementById('backToHighlights');
+    const nxtBtn = document.getElementById('nextStep');
+    const textArea = document.getElementById('entryText');
+    const sliders = [
+        document.getElementById('moodSlider'),
+        document.getElementById('activitySlider'),
+        document.getElementById('healthSlider')
+    ];
+
+    if (fromHighlights) {
+        if (modalOverlay) modalOverlay.classList.add('read-only');
+        if (backBtn) backBtn.classList.remove('hidden');
+        
+        if (nxtBtn) {
+            const span = nxtBtn.querySelector('span');
+            if (span) span.textContent = 'Ver Métricas';
+        }
+
+        if (textArea) {
+            textArea.disabled = true;
+            textArea.readOnly = true;
+        }
+        sliders.forEach(s => { if (s) s.disabled = true; });
+        
+        // When coming from highlights, we might want to hide the highlights modal first
+        closeHighlights();
+    } else {
+        if (modalOverlay) modalOverlay.classList.remove('read-only');
+        if (backBtn) backBtn.classList.add('hidden');
+        
+        if (nxtBtn) {
+            const span = nxtBtn.querySelector('span');
+            if (span) span.textContent = 'Siguiente';
+        }
+
+        if (textArea) {
+            textArea.disabled = false;
+            textArea.readOnly = false;
+        }
+        sliders.forEach(s => { if (s) s.disabled = false; });
+    }
+};
+
 // --- AI TEXT REFINEMENT ---
 async function refineTextWithAI() {
     const aiBtn = document.getElementById('aiFormatBtn');

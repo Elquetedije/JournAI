@@ -1028,6 +1028,126 @@ body {
   font-style: italic;
 }
 
+/* Highlights Grid & Cards */
+.highlights-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 1.5rem;
+  padding: 1rem 0;
+}
+
+.highlight-card {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 20px;
+  padding: 1.5rem;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  position: relative;
+  overflow: hidden;
+}
+
+.highlight-card:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: var(--accent-color);
+  transform: translateY(-5px);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+}
+
+.highlight-card::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(135deg, transparent 80%, rgba(255, 255, 255, 0.05) 100%);
+  pointer-events: none;
+}
+
+.h-header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.h-icon {
+  font-size: 2rem;
+  width: 50px;
+  height: 50px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 12px;
+}
+
+.h-info .h-label {
+  display: block;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  letter-spacing: 0.05em;
+  margin-bottom: 2px;
+}
+
+.h-info .h-title {
+  display: block;
+  font-weight: 700;
+  font-size: 1.1rem;
+}
+
+.h-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 0.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.h-date {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.h-value {
+  font-weight: 800;
+  font-size: 1.1rem;
+  color: var(--accent-color);
+}
+
+/* Back Button Premium */
+.back-btn-premium {
+  padding: 0;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #fff;
+  transition: all 0.3s ease;
+  z-index: 10001;
+}
+
+.back-btn-premium:hover {
+  background: rgba(255, 255, 255, 0.15);
+  border-color: var(--accent-color);
+  transform: translateX(-3px);
+  box-shadow: 0 0 15px rgba(59, 130, 246, 0.2);
+}
+
+.back-btn-premium.hidden {
+  display: none !important;
+}
+
 /* Desktop Modal Layouts */
 @media (min-width: 769px) {
   .modal-overlay {
@@ -1394,7 +1514,7 @@ input[type="range"]::-webkit-slider-thumb {
   .sidebar {
     width: 100% !important;
     height: auto !important;
-    min-height: 70px !important;
+    min-height: 64px !important; /* Slightly reduced height */
     flex-direction: row !important;
     position: fixed !important; /* Re-pinned to viewport for stability */
     bottom: 0 !important;
@@ -1491,7 +1611,8 @@ input[type="range"]::-webkit-slider-thumb {
   .main-content {
     flex: 1 !important;
     height: 100% !important;
-    padding-bottom: calc(75px + env(safe-area-inset-bottom)) !important; /* Space for the fixed bottom bar */
+    /* Space for the fixed bottom bar + 20px of safety margin to avoid overlap */
+    padding-bottom: calc(64px + env(safe-area-inset-bottom) + 20px) !important; 
     width: 100% !important;
     overflow: hidden;
     display: flex;
@@ -1554,29 +1675,30 @@ input[type="range"]::-webkit-slider-thumb {
 
   /* FAB Positioning */
   .fab {
-    bottom: 85px !important;
+    bottom: calc(80px + env(safe-area-inset-bottom)) !important; /* Positioned above the bottom bar */
     right: 1.5rem !important;
     width: 56px !important;
     height: 56px !important;
   }
 
   /* Modal Adjustments (True Full Screen & Premium) */
-  #app .modal-overlay {
+  /* Modal Adjustments (True Full Screen & Premium) */
+  #app .modal-overlay:not(.hidden), #app .modal:not(.hidden) {
     position: fixed !important;
     top: 0 !important;
     left: 0 !important;
     width: 100vw !important;
     height: 100vh !important;
-    background: #000 !important;
+    background: #000 !important; /* Pure black to prevent bleed-through */
     padding: 0 !important;
     display: flex !important;
     align-items: stretch !important;
     justify-content: stretch !important;
-    z-index: 4000 !important; /* Higher than everything else */
-    backdrop-filter: none !important;
+    z-index: 10000 !important; /* Well above the sidebar (5000) */
   }
 
-  #app .entry-modal-view {
+  /* Target both the entry modal and the highlights modal content when visible */
+  .entry-modal-view:not(.hidden), .modal-content.premium-settings:not(.hidden) {
     background: #000 !important;
     height: 100vh !important;
     width: 100vw !important;
@@ -1585,16 +1707,38 @@ input[type="range"]::-webkit-slider-thumb {
     border-radius: 0 !important;
     border: none !important;
     margin: 0 !important;
-    display: block !important; /* Avoid flex/grid conflicts for absolute children */
-    grid-template-columns: none !important;
+    display: flex !important;
+    flex-direction: column !important;
     position: fixed !important;
     top: 0 !important;
     left: 0 !important;
     box-shadow: none !important;
     transform: none !important;
-    overflow-y: auto !important;
-    z-index: 4001 !important;
-    transition: transform 0.3s cubic-bezier(0.23, 1, 0.32, 1) !important;
+    overflow: hidden !important;
+    z-index: 10001 !important;
+  }
+
+  .settings-body {
+    padding: 2rem 1.5rem 120px 1.5rem !important; /* Increased padding to clear bottom bar (64px + 56px buffer) */
+    flex: 1;
+    overflow-y: auto;
+  }
+
+  /* Robust Read-Only Mode for Highlights */
+  .modal-overlay.read-only #saveEntry,
+  .modal-overlay.read-only #deleteEntry,
+  .modal-overlay.read-only #aiFormatBtn,
+  .modal-overlay.read-only #skipMoodBtn {
+    display: none !important;
+    visibility: hidden !important;
+    pointer-events: none !important;
+  }
+
+  .modal-overlay.read-only #entryText,
+  .modal-overlay.read-only .metrics-container input[type="range"] {
+    pointer-events: none !important;
+    opacity: 0.8 !important;
+    cursor: default !important;
   }
 
   /* PTR Feedback */
