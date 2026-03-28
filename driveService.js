@@ -219,17 +219,35 @@ class DriveService {
 
     static calculateAverages(entriesList) {
         if (!entriesList || entriesList.length === 0) return { mood: 'null', health: 'null', activity: 'null' };
-        const sums = entriesList.reduce((acc, e) => {
-            acc.mood += (Number(e.mood) || 0);
-            acc.health += (Number(e.health) || 0);
-            acc.activity += (Number(e.activity) || 0);
-            return acc;
-        }, { mood: 0, health: 0, activity: 0 });
-        const count = entriesList.length;
+        
+        const data = {
+            mood: { sum: 0, count: 0 },
+            health: { sum: 0, count: 0 },
+            activity: { sum: 0, count: 0 }
+        };
+
+        entriesList.forEach(e => {
+            const m = Number(e.mood);
+            if (!isNaN(m) && m > 0) {
+                data.mood.sum += m;
+                data.mood.count++;
+            }
+            const h = Number(e.health);
+            if (!isNaN(h) && h > 0) {
+                data.health.sum += h;
+                data.health.count++;
+            }
+            const a = Number(e.activity);
+            if (!isNaN(a) && a > 0) {
+                data.activity.sum += a;
+                data.activity.count++;
+            }
+        });
+
         return {
-            mood: (sums.mood / count).toFixed(1),
-            health: (sums.health / count).toFixed(1),
-            activity: (sums.activity / count).toFixed(1)
+            mood: data.mood.count > 0 ? (data.mood.sum / data.mood.count).toFixed(1) : 'null',
+            health: data.health.count > 0 ? (data.health.sum / data.health.count).toFixed(1) : 'null',
+            activity: data.activity.count > 0 ? (data.activity.sum / data.activity.count).toFixed(1) : 'null'
         };
     }
 
