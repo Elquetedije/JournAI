@@ -157,8 +157,8 @@ async function handleForceUpload() {
     showSyncIndicator();
     updateSyncStatus('Subiendo datos locales a la nube...', 'syncing');
     try {
-        const entries = getEntries();
-        const success = await window.DriveService.syncData(entries);
+        const fullData = getFullDataForExport();
+        const success = await window.DriveService.syncData(fullData);
         if (success) {
             alert('¡Subida forzada completada con éxito!');
             updateSyncStatus('Sincronización manual completada', 'success');
@@ -179,9 +179,16 @@ async function handleForceDownload() {
     showSyncIndicator();
     updateSyncStatus('Descargando datos de la nube...', 'syncing');
     try {
-        const remoteEntries = await window.DriveService.getSyncData();
-        if (remoteEntries && Object.keys(remoteEntries).length > 0) {
-            localStorage.setItem('journAI_entries', JSON.stringify(remoteEntries));
+        const cloudData = await window.DriveService.getSyncData();
+        if (cloudData) {
+            if (cloudData.entries) {
+                localStorage.setItem('journAI_entries', JSON.stringify(cloudData.entries));
+                if (cloudData.gemini_api_key) {
+                    localStorage.setItem('gemini_api_key', cloudData.gemini_api_key);
+                }
+            } else {
+                localStorage.setItem('journAI_entries', JSON.stringify(cloudData));
+            }
             render();
             checkTodayEntry();
             alert('¡Descarga forzada completada! Datos locales reemplazados.');
@@ -202,10 +209,18 @@ async function performStartupSync() {
     console.log('[JournAI] performStartupSync started (Replacement Mode)');
     updateSyncStatus('Sincronizando datos de otros dispositivos...', 'syncing');
     try {
-        const remoteEntries = await window.DriveService.getSyncData();
-        if (remoteEntries && Object.keys(remoteEntries).length > 0) {
-            console.log(`[JournAI] Replacing local data with remote data (${Object.keys(remoteEntries).length} entries)`);
-            localStorage.setItem('journAI_entries', JSON.stringify(remoteEntries));
+        const cloudData = await window.DriveService.getSyncData();
+        if (cloudData) {
+            if (cloudData.entries && Object.keys(cloudData.entries).length > 0) {
+                console.log(`[JournAI] Replacing local data with remote data (${Object.keys(cloudData.entries).length} entries)`);
+                localStorage.setItem('journAI_entries', JSON.stringify(cloudData.entries));
+                if (cloudData.gemini_api_key) {
+                    localStorage.setItem('gemini_api_key', cloudData.gemini_api_key);
+                }
+            } else if (!cloudData.entries && Object.keys(cloudData).length > 0) {
+                // Old format
+                localStorage.setItem('journAI_entries', JSON.stringify(cloudData));
+            }
             console.log('[JournAI] Startup sync completed');
             render();
             checkTodayEntry();
@@ -1001,19 +1016,40 @@ if (exportDocBtn) exportDocBtn.addEventListener('click', exportToGoogleDoc);
 
 const settingsBtn = document.getElementById('settingsBtn');
 const settingsModal = document.getElementById('settingsModal');
+const geminiApiKeyInput = document.getElementById('geminiApiKeyInput');
+
 if (settingsBtn) settingsBtn.addEventListener('click', () => {
-    if (settingsModal) settingsModal.classList.remove('hidden');
+    if (settingsModal) {
+        settingsModal.classList.remove('hidden');
+        if (geminiApiKeyInput) {
+            geminiApiKeyInput.value = localStorage.getItem('gemini_api_key') || '';
+        }
+        fetchGeminiModels(); // Fetch available models when opening settings
+    }
 });
+
+if (geminiApiKeyInput) {
+    geminiApiKeyInput.addEventListener('input', (e) => {
+        localStorage.setItem('gemini_api_key', e.target.value.trim());
+    });
+}
 
 const closeSettings = document.getElementById('closeSettings');
 if (closeSettings) closeSettings.addEventListener('click', () => {
     if (settingsModal) settingsModal.classList.add('hidden');
 });
 
+function getFullDataForExport() {
+    return {
+        entries: getEntries(),
+        gemini_api_key: localStorage.getItem('gemini_api_key') || ''
+    };
+}
+
 const downloadBackupBtn = document.getElementById('downloadBackup');
 if (downloadBackupBtn) downloadBackupBtn.addEventListener('click', () => {
-    const entries = getEntries();
-    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(entries, null, 2));
+    const backupData = getFullDataForExport();
+    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(backupData, null, 2));
     const a = document.createElement('a');
     a.href = dataStr;
     a.download = `journai_backup.json`;
@@ -1039,7 +1075,14 @@ if (uploadBackupBtn && importFile) {
             try {
                 const importedData = JSON.parse(event.target.result);
                 if (confirm('Deseas restaurar esta copia?')) {
-                    localStorage.setItem('journAI_entries', JSON.stringify(importedData));
+                    if (importedData.entries) {
+                        localStorage.setItem('journAI_entries', JSON.stringify(importedData.entries));
+                        if (importedData.gemini_api_key) {
+                            localStorage.setItem('gemini_api_key', importedData.gemini_api_key);
+                        }
+                    } else {
+                        localStorage.setItem('journAI_entries', JSON.stringify(importedData));
+                    }
                     render();
                     if (settingsModal) settingsModal.classList.add('hidden');
                 }
@@ -1305,10 +1348,11 @@ async function refineTextWithAI() {
     if (!aiBtn || !textArea || !textArea.value.trim()) return;
 
     const originalText = textArea.value;
-    const apiKey = window.CONFIG?.GEMINI_API_KEY;
+    const apiKey = localStorage.getItem('gemini_api_key');
     
     if (!apiKey) {
-        alert('API Key de Gemini no configurada.');
+        alert('Por favor, configura tu Gemini API Key en el Centro de Control.');
+        if (settingsModal) settingsModal.classList.remove('hidden');
         return;
     }
 
@@ -1316,8 +1360,8 @@ async function refineTextWithAI() {
         aiBtn.disabled = true;
         aiBtn.classList.add('loading');
         
-        // Using the user-specified model gemini-3.1-flash-lite-preview
-        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent?key=${apiKey}`, {
+        // Using model gemini-3.1-flash-lite
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key=${apiKey}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -1328,6 +1372,13 @@ async function refineTextWithAI() {
                 }]
             })
         });
+
+        if (!response.ok) {
+            const errorData = await response.json();
+            const errorMessage = errorData.error ? errorData.error.message : response.statusText;
+            console.error("Detalle completo del error (Refine):", errorData);
+            throw new Error(errorMessage);
+        }
 
         const data = await response.json();
         if (data.candidates && data.candidates[0].content.parts[0].text) {
@@ -1345,6 +1396,45 @@ async function refineTextWithAI() {
     }
 }
 
+async function fetchGeminiModels() {
+    const selector = document.getElementById('modelSelector');
+    const apiKey = localStorage.getItem('gemini_api_key');
+    
+    if (!selector) return;
+
+    if (!apiKey) {
+        selector.innerHTML = '<option value="">Clave no configurada</option>';
+        return;
+    }
+
+    try {
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
+        const data = await response.json();
+        
+        if (data.models) {
+            // Filter models that support content generation
+            const validModels = data.models.filter(m => 
+                m.supportedGenerationMethods && m.supportedGenerationMethods.includes("generateContent")
+            );
+
+            selector.innerHTML = '';
+            validModels.forEach(model => {
+                const opt = document.createElement('option');
+                opt.value = model.name; // e.g., "models/gemini-1.5-flash"
+                opt.textContent = model.displayName || model.name;
+                
+                // Set default if it's the requested one or keep current if already selected
+                if (model.name === 'models/gemini-1.5-flash') opt.selected = true;
+                
+                selector.appendChild(opt);
+            });
+        }
+    } catch (err) {
+        console.error('[AI Models] Fetch failed:', err);
+        selector.innerHTML = '<option value="models/gemini-1.5-flash">Error cargando lista (Usando Flash 1.5)</option>';
+    }
+}
+
 async function handleGoogleDocImport() {
     const fileInput = document.getElementById('importDocFile');
     if (fileInput) fileInput.click();
@@ -1352,10 +1442,11 @@ async function handleGoogleDocImport() {
 
 async function processAIImport(text) {
     const importBtn = document.getElementById('importDocBtn');
-    const apiKey = window.CONFIG?.GEMINI_API_KEY;
+    const apiKey = localStorage.getItem('gemini_api_key');
     
     if (!apiKey) {
-        alert('API Key de Gemini no configurada.');
+        alert('Por favor, configura tu Gemini API Key en el Centro de Control.');
+        if (settingsModal) settingsModal.classList.remove('hidden');
         return;
     }
 
@@ -1366,19 +1457,20 @@ async function processAIImport(text) {
         }
         updateSyncStatus('Importando y procesando con IA...', 'syncing');
 
-        const truncatedText = text.substring(0, 100000); 
+        // Límite de seguridad para evitar errores de token en archivos masivos
+        const truncatedText = text.substring(0, 150000); 
         
-        const promptText = `Analiza el siguiente texto de un diario personal. Extrae cada entrada diaria identificando su fecha. 
-        Reglas Estrictas:
-        1. Devuelve un objeto JSON donde las claves sean las fechas en formato 'YYYY-MM-DD' y los valores el texto de la entrada.
-        2. IGNORA cualquier fragmento de texto que NO esté claramente asociado a una fecha específica. No incluyas introducciones, ruidos de formato o notas sin fecha.
-        3. Si hay varias entradas para el mismo día, concaténalas en el mismo valor de texto.
-        4. Reemplaza nombres de meses por números correctamente (Enero -> 01, etc.).
-        5. Devuelve ÚNICAMENTE el JSON crudo.
+        const systemInstruction = "Eres un asistente de extracción de datos. Tu única tarea es leer el siguiente texto de un diario personal, identificar cada entrada diaria y extraer la fecha y el contenido. DEBES responder ÚNICAMENTE con un objeto JSON válido que contenga un array llamado 'entries'. Cada objeto dentro de 'entries' debe tener dos campos: 'date' (en formato YYYY-MM-DD) y 'content' (el texto de la entrada). No incluyas texto adicional, ni saludos, ni formato markdown (sin bloques de código). Solo el JSON crudo.";
+        
+        const promptText = `${systemInstruction}\n\nTexto del diario:\n\n${truncatedText}`;
 
-        Texto del diario:\n\n${truncatedText}`;
+        const modelToUse = document.getElementById('modelSelector')?.value || 'models/gemini-1.5-flash';
+        console.log(`[AI Import] Using model: ${modelToUse}`);
+        
+        // Dynamic URL based on selector
+        const url = `https://generativelanguage.googleapis.com/v1beta/${modelToUse}:generateContent?key=${apiKey}`;
 
-        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent?key=${apiKey}`, {
+        const response = await fetch(url, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -1389,33 +1481,50 @@ async function processAIImport(text) {
             })
         });
 
+        if (!response.ok) {
+            const errorData = await response.json();
+            const errorMessage = errorData.error ? errorData.error.message : response.statusText;
+            console.error("Detalle completo del error (Import):", errorData);
+            throw new Error(errorMessage);
+        }
+
         const data = await response.json();
-        let aiExtracted = {};
+        let aiExtracted = { entries: [] };
         
         try {
+            if (!data.candidates?.[0]?.content?.parts?.[0]?.text) {
+                throw new Error('La IA no devolvió ninguna respuesta válida.');
+            }
             const rawText = data.candidates[0].content.parts[0].text;
-            // Al usar response_mime_type: application/json, la respuesta es JSON puro
             aiExtracted = JSON.parse(rawText);
         } catch (e) {
             console.error('[AI Import] Parsing failed:', e, data);
-            throw new Error('La IA no devolvió un formato válido. Inténtalo de nuevo.');
+            throw new Error('La IA no devolvió un formato válido (JSON esperado). Inténtalo de nuevo.');
+        }
+
+        if (!Array.isArray(aiExtracted.entries)) {
+            throw new Error('El formato de respuesta de la IA no contiene un array de "entries".');
         }
 
         const currentEntries = getEntries();
         let importedCount = 0;
         let skippedCount = 0;
 
-        for (const [dateStr, textEntry] of Object.entries(aiExtracted)) {
-            const dateParts = dateStr.split('-');
+        for (const entry of aiExtracted.entries) {
+            const { date, content } = entry;
+            if (!date || !content) continue;
+
+            const dateParts = date.split('-');
             if (dateParts.length === 3) {
                 const year = parseInt(dateParts[0]);
-                const month = parseInt(dateParts[1]) - 1;
+                const month = parseInt(dateParts[1]) - 1; // 0-indexed para la app
                 const day = parseInt(dateParts[2]);
                 const normalizedKey = `${year}-${month}-${day}`;
 
-                if (!currentEntries[normalizedKey]) {
+                // Solo guardamos si no existe ya para ese día o si el actual está vacío
+                if (!currentEntries[normalizedKey] || !currentEntries[normalizedKey].text) {
                     currentEntries[normalizedKey] = {
-                        text: textEntry.trim(),
+                        text: content.trim(),
                         mood: null,
                         activity: null,
                         health: null
@@ -1435,20 +1544,20 @@ async function processAIImport(text) {
             const syncSuccess = await window.DriveService.syncData(currentEntries);
             
             if (syncSuccess) {
-                alert(`¡Importación exitosa! Se han añadido ${importedCount} entradas nuevas. (${skippedCount} ya existían y fueron respetadas). Sincronización en la nube actualizada.`);
-                updateSyncStatus('Importación y Sincronización completadas', 'success');
+                alert(`¡Importación exitosa! Se han guardado ${importedCount} entradas correctamente. (${skippedCount} ya existían).`);
+                updateSyncStatus('Importación completada', 'success');
             } else {
-                alert(`Se han añadido ${importedCount} entradas localmente, pero falló la sincronización en la nube. Intenta sincronizar manualmente.`);
-                updateSyncStatus('Importación local completada (Error en nube)', 'error');
+                alert(`Se han guardado ${importedCount} entradas localmente, pero falló la sincronización en la nube.`);
+                updateSyncStatus('Error en sincronización post-import', 'error');
             }
         } else {
-            alert('No se encontraron entradas nuevas para importar o el formato no fue reconocido.');
-            updateSyncStatus('Sin entradas nuevas para importar', 'success');
+            alert('No se encontraron entradas nuevas o válidas para importar.');
+            updateSyncStatus('Sin cambios tras importación', 'success');
         }
 
     } catch (err) {
-        console.error('[Import] Error:', err);
-        alert('Error en el proceso de importación: ' + err.message);
+        console.error('[Import] Error total:', err);
+        alert('Error al procesar el archivo: ' + err.message);
         updateSyncStatus('Error en importación', 'error');
     } finally {
         if (importBtn) {
