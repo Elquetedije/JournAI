@@ -1087,11 +1087,13 @@ window.addEventListener('touchmove', (e) => {
             // Physical pull effect with resistance
             const dampedDistance = Math.min(pullDistance * 0.4, 100);
             
-            // Transform main content and sidebar independently
-            // Transform main content
-            if (mainContent) mainContent.style.transform = `translateY(${dampedDistance}px)`;
+            // Use margin-top for layout-safe displacement on mobile
+            if (mainContent) {
+                mainContent.style.setProperty('--ptr-margin', `${dampedDistance}px`);
+                mainContent.style.setProperty('--ptr-transition', 'none');
+            }
             
-            // Sidebar moves only if NOT in mobile mode (bottom bar)
+            // Sidebar moves ONLY on desktop
             if (sidebar && window.innerWidth > 768) {
                 sidebar.style.transform = `translateY(${dampedDistance * 0.3}px)`;
             }
@@ -1111,14 +1113,14 @@ window.addEventListener('touchmove', (e) => {
 window.addEventListener('touchend', () => {
     if (pullDistance > PTR_THRESHOLD) {
         // Refreshing state
-        const transition = 'transform 0.4s cubic-bezier(0.23, 1, 0.32, 1)';
+        const transition = 'margin-top 0.4s cubic-bezier(0.23, 1, 0.32, 1)';
         if (mainContent) {
-            mainContent.style.transition = transition;
-            mainContent.style.transform = 'translateY(70px)';
+            mainContent.style.setProperty('--ptr-transition', transition);
+            mainContent.style.setProperty('--ptr-margin', '70px');
         }
         if (sidebar && window.innerWidth > 768) {
-            sidebar.style.transition = transition;
-            sidebar.style.transform = 'translateY(21px)'; // 70 * 0.3
+            sidebar.style.transition = 'transform 0.4s cubic-bezier(0.23, 1, 0.32, 1)';
+            sidebar.style.transform = 'translateY(21px)';
         }
         if (ptrSpinner) ptrSpinner.style.animationPlayState = 'running';
         
@@ -1127,25 +1129,29 @@ window.addEventListener('touchend', () => {
         }, 800);
     } else {
         // Reset
-        const transition = 'transform 0.3s cubic-bezier(0.23, 1, 0.32, 1)';
+        const transition = 'margin-top 0.3s cubic-bezier(0.23, 1, 0.32, 1)';
         if (mainContent) {
-            mainContent.style.transition = transition;
-            mainContent.style.transform = ''; // Clear inline style
+            mainContent.style.setProperty('--ptr-transition', transition);
+            mainContent.style.setProperty('--ptr-margin', '0px');
+            
+            // Critical cleanup: ensure layout is perfect after transition
+            setTimeout(() => {
+                mainContent.style.removeProperty('--ptr-margin');
+                mainContent.style.removeProperty('--ptr-transition');
+                void mainContent.offsetHeight; // Force reflow
+            }, 300);
         }
         if (sidebar) {
-            sidebar.style.transition = transition;
-            sidebar.style.transform = ''; // Clear inline style
+            if (window.innerWidth > 768) {
+                sidebar.style.transition = 'transform 0.3s cubic-bezier(0.23, 1, 0.32, 1)';
+                sidebar.style.transform = ''; 
+                setTimeout(() => { sidebar.style.transition = ''; }, 300);
+            }
         }
         if (ptrIndicator) {
             ptrIndicator.style.opacity = '0';
             ptrIndicator.style.transform = 'translateY(-50px)';
         }
-        
-        // Clean up transitions after they finish
-        setTimeout(() => {
-            if (mainContent) mainContent.style.transition = '';
-            if (sidebar) sidebar.style.transition = '';
-        }, 300);
     }
     touchStartPos = 0;
     pullDistance = 0;
