@@ -76,8 +76,14 @@ class DriveService {
         try {
             const token = await this.getAccessToken();
             const folderId = await this.findOrCreateRecursiveFolder(token, 'JournAI Backups/Backup b');
+            
+            // Format: backup_2024-03-28_15-30-00.json
+            const now = new Date();
+            const timestamp = now.toISOString().replace(/T/, '_').replace(/\..+/, '').replace(/:/g, '-');
+            const filename = `backup_${timestamp}.json`;
+            
             const content = JSON.stringify(entries, null, 2);
-            await this.findOrCreateFile(token, 'journai_backup.json', folderId, content);
+            await this.findOrCreateFile(token, filename, folderId, content);
             return true;
         } catch (e) {
             console.error('[DriveService] Backup Failed:', e);
