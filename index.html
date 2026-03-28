@@ -2,9 +2,9 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>JournAI - Diario Estelar</title>
-    <link rel="stylesheet" href="style.css?v=17">
+    <link rel="stylesheet" href="style.css?v=18">
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#0a0a0a">
     <link rel="apple-touch-icon" href="icon-192.png">
@@ -102,7 +102,7 @@
                 <header class="modal-header">
                     <div class="header-info">
                         <span class="pre-title">Configuración</span>
-                        <h2>Centro de Control</h2>
+                        <h2>Centro de Control (Actualizado)</h2>
                     </div>
                     <button id="closeSettings" class="close-btn-minimal" title="Cerrar Ajustes">
                         <span class="close-icon">&times;</span>
@@ -135,6 +135,15 @@
                                         <div class="btn-text">
                                             <span class="btn-title">Restaurar JSON</span>
                                             <span class="btn-desc">Importar archivo previo</span>
+                                        </div>
+                                    </button>
+                                </div>
+                                <div class="action-item full-width">
+                                    <button id="importDocBtn" class="action-btn-premium highlight-alt">
+                                        <span class="btn-icon">📄✨</span>
+                                        <div class="btn-text">
+                                            <span class="btn-title">Importar de Google Doc</span>
+                                            <span class="btn-desc">Tus memorias antiguas, procesadas con IA</span>
                                         </div>
                                     </button>
                                 </div>
@@ -261,8 +270,8 @@
         </div>
     </div>
 
-    <script src="config.js?v=2"></script>
-    <script src="driveService.js?v=2"></script>
-    <script src="app.js?v=3"></script>
+    <script src="config.js?v=3"></script>
+    <script src="driveService.js?v=3"></script>
+    <script src="app.js?v=4"></script>
 </body>
 </html>

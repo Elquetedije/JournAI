@@ -1134,7 +1134,12 @@ window.addEventListener('touchend', () => {
         }
         if (sidebar) {
             sidebar.style.transition = transition;
-            sidebar.style.transform = 'translateY(0)';
+            // On mobile, force transform to none to override any potential leaked styles
+            if (window.innerWidth <= 768) {
+                sidebar.style.transform = 'none';
+            } else {
+                sidebar.style.transform = 'translateY(0)';
+            }
         }
         if (ptrIndicator) {
             ptrIndicator.style.opacity = '0';
@@ -1192,6 +1197,136 @@ async function refineTextWithAI() {
     }
 }
 
+async function handleGoogleDocImport() {
+    const importBtn = document.getElementById('importDocBtn');
+    if (!importBtn) return;
+
+    let docInput = prompt('Pega la URL o el ID del Google Doc que contiene tu diario antiguo:');
+    if (!docInput) return;
+
+    // Extract ID from URL if necessary
+    let fileId = docInput;
+    const match = docInput.match(/\/d\/([a-zA-Z0-9-_]+)/);
+    if (match) fileId = match[1];
+
+    const apiKey = window.CONFIG?.GEMINI_API_KEY;
+    if (!apiKey) {
+        alert('API Key de Gemini no configurada.');
+        return;
+    }
+
+    try {
+        importBtn.disabled = true;
+        importBtn.querySelector('.btn-title').textContent = 'Procesando con IA...';
+        updateSyncStatus('Importando desde Google Doc...', 'syncing');
+
+        // 1. Get Text from Doc
+        const docText = await window.DriveService.exportDocAsText(fileId);
+        if (!docText || docText.length < 10) {
+            throw new Error('El documento parece estar vacío o no se pudo leer.');
+        }
+
+        // 2. Send to Gemini for parsing
+        // We limit text to ~50k characters to stay within reasonable limits for a single call
+        const truncatedText = docText.substring(0, 100000); 
+        
+        const promptText = `Analiza el siguiente texto de un diario personal. Extrae cada entrada diaria identificando su fecha. 
+        Formato de salida requerido: Un objeto JSON puro donde las claves sean las fechas en formato 'YYYY-MM-DD' y los valores sean el texto de la entrada correspondiente.
+        Reglas:
+        1. Si una entrada no tiene fecha clara, omítela o agrúpala con la fecha anterior si parece parte de ella.
+        2. Si hay varias entradas para el mismo día, únelas.
+        3. El texto está en Español.
+        4. Reemplaza nombres de meses por números correctamente (Enero -> 01, etc.).
+        5. Devuelve ÚNICAMENTE el JSON crudo, sin bloques de código markdown ni texto adicional.
+
+        Texto del diario:\n\n${truncatedText}`;
+
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent?key=${apiKey}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                contents: [{ parts: [{ text: promptText }] }]
+            })
+        });
+
+        const data = await response.json();
+        let aiExtracted = {};
+        
+        try {
+            const rawText = data.candidates[0].content.parts[0].text;
+            // Clean markdown if present
+            const jsonMatch = rawText.match(/\{[\s\S]*\}/);
+            aiExtracted = JSON.parse(jsonMatch ? jsonMatch[0] : rawText);
+        } catch (e) {
+            console.error('[AI Import] Parsing failed:', e, data);
+            throw new Error('La IA no devolvió un formato válido. Inténtalo de nuevo.');
+        }
+
+        // 3. Merging logic
+        const currentEntries = getEntries();
+        let importedCount = 0;
+        let skippedCount = 0;
+
+        for (const [dateStr, text] of Object.entries(aiExtracted)) {
+            // Validate date key format YYYY-MM-DD
+            const dateParts = dateStr.split('-');
+            if (dateParts.length === 3) {
+                // Adjust to app format: YYYY-M-D (Month is 0-indexed in our app logic)
+                const year = parseInt(dateParts[0]);
+                const month = parseInt(dateParts[1]) - 1;
+                const day = parseInt(dateParts[2]);
+                const normalizedKey = `${year}-${month}-${day}`;
+
+                if (!currentEntries[normalizedKey]) {
+                    currentEntries[normalizedKey] = {
+                        text: text.trim(),
+                        mood: null,
+                        activity: null,
+                        health: null
+                    };
+                    importedCount++;
+                } else {
+                    skippedCount++;
+                }
+            }
+        }
+
+        // 4. Save and Sync
+        if (importedCount > 0) {
+            localStorage.setItem('journAI_entries', JSON.stringify(currentEntries));
+            render();
+            
+            updateSyncStatus('Subiendo datos importados a la nube...', 'syncing');
+            const syncSuccess = await window.DriveService.syncData(currentEntries);
+            
+            if (syncSuccess) {
+                alert(`¡Importación exitosa! Se han añadido ${importedCount} entradas nuevas. (${skippedCount} ya existían y fueron respetadas). Sincronización en la nube actualizada.`);
+                updateSyncStatus('Importación y Sindicación completadas', 'success');
+            } else {
+                alert(`Se han añadido ${importedCount} entradas localmente, pero falló la sincronización en la nube. Intenta sincronizar manualmente.`);
+                updateSyncStatus('Importación local completada (Error en nube)', 'error');
+            }
+        } else {
+            alert('No se encontraron entradas nuevas para importar o el formato no fue reconocido.');
+            updateSyncStatus('Sin entradas nuevas para importar', 'success');
+        }
+
+    } catch (err) {
+        console.error('[Import] Error:', err);
+        alert('Error en el proceso de importación: ' + err.message);
+        updateSyncStatus('Error en importación', 'error');
+    } finally {
+        importBtn.disabled = false;
+        importBtn.querySelector('.btn-title').textContent = 'Importar de Google Doc';
+    }
+}
+
+// Global Event Listeners Extension
+document.addEventListener('DOMContentLoaded', () => {
+    const importBtn = document.getElementById('importDocBtn');
+    if (importBtn) importBtn.addEventListener('click', handleGoogleDocImport);
+});
+
 // Initialize in sequence
 async function initApp() {
     render();
@@ -1205,7 +1340,7 @@ initApp();
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
         // Register sw.js with a version query to force browser to check it
-        navigator.serviceWorker.register('./sw.js?v=18').catch(err => console.log(err));
+        navigator.serviceWorker.register('./sw.js?v=19').catch(err => console.log(err));
     });
 }
 

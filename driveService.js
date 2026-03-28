@@ -557,6 +557,24 @@ class DriveService {
             return false;
         }
     }
+    static async exportDocAsText(fileId) {
+        try {
+            const token = await this.getAccessToken();
+            // Google Drive API export endpoint (for Google Docs to plain text)
+            const url = `https://www.googleapis.com/drive/v3/files/${fileId}/export?mimeType=text/plain`;
+            const res = await fetch(url, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (!res.ok) {
+                const err = await res.json();
+                throw new Error(err.error?.message || 'Failed to export document');
+            }
+            return await res.text();
+        } catch (e) {
+            console.error('[DriveService] Export Text Failed:', e);
+            throw e;
+        }
+    }
 }
 
 window.DriveService = DriveService;
