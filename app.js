@@ -1083,7 +1083,7 @@ window.addEventListener('touchmove', (e) => {
         const currentPos = e.touches[0].pageY;
         pullDistance = currentPos - touchStartPos;
         
-        if (pullDistance > 0) {
+        if (pullDistance > 10) {
             // CRITICAL: Block the browser's default bounce/rubber-banding to keep UI fixed
             if (e.cancelable) e.preventDefault();
 
