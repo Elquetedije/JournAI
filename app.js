@@ -1099,8 +1099,10 @@ window.addEventListener('keydown', (e) => {
     }
 });
 
-// --- PULL TO REFRESH (MOBILE) ---
-let touchStartPos = 0;
+// --- PULL TO REFRESH & SWIPE NAVIGATION (MOBILE) ---
+let touchStartX = 0;
+let touchStartY = 0;
+let touchStartPos = 0; // Legacy ref for Y alignment
 let pullDistance = 0;
 const PTR_THRESHOLD = 150;
 const ptrIndicator = document.getElementById('ptrIndicator');
@@ -1114,6 +1116,8 @@ window.addEventListener('touchstart', (e) => {
     if (isModalOpen) return;
 
     if (window.scrollY === 0) {
+        touchStartX = e.touches[0].pageX;
+        touchStartY = e.touches[0].pageY;
         touchStartPos = e.touches[0].pageY;
         // Disable transitions during pull
         if (mainContent) mainContent.style.transition = 'none';
@@ -1149,7 +1153,14 @@ window.addEventListener('touchmove', (e) => {
 }, { passive: false });
 
 window.addEventListener('touchend', (e) => {
-    if (pullDistance > PTR_THRESHOLD) {
+    const touchEndX = e.changedTouches[0].pageX;
+    const touchEndY = e.changedTouches[0].pageY;
+    const deltaX = touchEndX - touchStartX;
+    const deltaY = touchEndY - touchStartY;
+    const isModalOpen = document.querySelector('.modal:not(.hidden), .modal-overlay:not(.hidden)');
+
+    // Vertical Pull to Refresh logic
+    if (pullDistance > PTR_THRESHOLD && !isModalOpen) {
         // Refreshing state - hold indicator in place
         if (ptrIndicator) {
             ptrIndicator.style.transition = 'transform 0.3s cubic-bezier(0.23, 1, 0.32, 1), opacity 0.3s ease';
@@ -1164,14 +1175,34 @@ window.addEventListener('touchend', (e) => {
         setTimeout(() => {
             window.location.reload();
         }, 500);
-    } else {
-        // Reset purely visual indicator
+    } 
+    // Horizontal Swipe Navigation logic (Calendar View Changes)
+    else if (Math.abs(deltaX) > 70 && Math.abs(deltaX) > Math.abs(deltaY) * 1.5 && !isModalOpen) {
+        if (deltaX < -70) {
+            // Swipe Left (Moving Content to left) -> Next
+            if (activeView === 'days') currentDate.setMonth(currentDate.getMonth() + 1);
+            else if (activeView === 'months') currentDate.setFullYear(currentDate.getFullYear() + 1);
+            else if (activeView === 'years') currentDate.setFullYear(currentDate.getFullYear() + 12);
+            render();
+        } else if (deltaX > 70) {
+            // Swipe Right (Moving Content to right) -> Previous
+            if (activeView === 'days') currentDate.setMonth(currentDate.getMonth() - 1);
+            else if (activeView === 'months') currentDate.setFullYear(currentDate.getFullYear() - 1);
+            else if (activeView === 'years') currentDate.setFullYear(currentDate.getFullYear() - 12);
+            render();
+        }
+    }
+
+    // Always reset visual indicator and state variables
+    if (pullDistance <= PTR_THRESHOLD) {
         if (ptrIndicator) {
             ptrIndicator.style.transition = 'transform 0.4s cubic-bezier(0.23, 1, 0.32, 1), opacity 0.3s ease';
             ptrIndicator.style.transform = 'translateX(-50%) translateY(-100px)';
             ptrIndicator.style.opacity = '0';
         }
     }
+    touchStartX = 0;
+    touchStartY = 0;
     touchStartPos = 0;
     pullDistance = 0;
 }, { passive: false });
