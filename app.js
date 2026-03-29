@@ -1380,9 +1380,10 @@ async function refineTextWithAI() {
 
     const originalText = textArea.value;
     const apiKey = localStorage.getItem('gemini_api_key');
+    const selectedModel = localStorage.getItem('gemini_selected_model');
     
-    if (!apiKey) {
-        alert('Por favor, configura tu Gemini API Key en el Centro de Control.');
+    if (!selectedModel) {
+        alert('Por favor, selecciona un modelo de IA en el Centro de Control.');
         if (settingsModal) settingsModal.classList.remove('hidden');
         return;
     }
@@ -1391,8 +1392,8 @@ async function refineTextWithAI() {
         aiBtn.disabled = true;
         aiBtn.classList.add('loading');
         
-        // Using model gemini-3.1-flash-lite
-        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key=${apiKey}`, {
+        // Using dynamic model selection
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/${selectedModel}:generateContent?key=${apiKey}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -1420,7 +1421,7 @@ async function refineTextWithAI() {
         }
     } catch (err) {
         console.error('[AI] Error:', err);
-        alert('Error al conectar con el servicio de IA.');
+        alert('Error al conectar con el servicio de IA o modelo no disponible.');
     } finally {
         aiBtn.disabled = false;
         aiBtn.classList.remove('loading');
@@ -1449,20 +1450,25 @@ async function fetchGeminiModels() {
             );
 
             selector.innerHTML = '';
+            const savedModel = localStorage.getItem('gemini_selected_model');
+
             validModels.forEach(model => {
                 const opt = document.createElement('option');
                 opt.value = model.name; // e.g., "models/gemini-1.5-flash"
                 opt.textContent = model.displayName || model.name;
                 
-                // Set default if it's the requested one or keep current if already selected
-                if (model.name === 'models/gemini-1.5-flash') opt.selected = true;
+                if (savedModel && model.name === savedModel) {
+                    opt.selected = true;
+                } else if (!savedModel && model.name === 'models/gemini-1.5-flash') {
+                    opt.selected = true;
+                }
                 
                 selector.appendChild(opt);
             });
         }
     } catch (err) {
         console.error('[AI Models] Fetch failed:', err);
-        selector.innerHTML = '<option value="models/gemini-1.5-flash">Error cargando lista (Usando Flash 1.5)</option>';
+        selector.innerHTML = '<option value="">Error cargando lista (Verifica tu API Key)</option>';
     }
 }
 
@@ -1474,9 +1480,16 @@ async function handleGoogleDocImport() {
 async function processAIImport(text) {
     const importBtn = document.getElementById('importDocBtn');
     const apiKey = localStorage.getItem('gemini_api_key');
+    const selectedModel = localStorage.getItem('gemini_selected_model');
     
     if (!apiKey) {
         alert('Por favor, configura tu Gemini API Key en el Centro de Control.');
+        if (settingsModal) settingsModal.classList.remove('hidden');
+        return;
+    }
+
+    if (!selectedModel) {
+        alert('Por favor, selecciona un modelo de IA en el Centro de Control.');
         if (settingsModal) settingsModal.classList.remove('hidden');
         return;
     }
@@ -1494,12 +1507,9 @@ async function processAIImport(text) {
         const systemInstruction = "Eres un asistente de extracción de datos. Tu única tarea es leer el siguiente texto de un diario personal, identificar cada entrada diaria y extraer la fecha y el contenido. DEBES responder ÚNICAMENTE con un objeto JSON válido que contenga un array llamado 'entries'. Cada objeto dentro de 'entries' debe tener dos campos: 'date' (en formato YYYY-MM-DD) y 'content' (el texto de la entrada). No incluyas texto adicional, ni saludos, ni formato markdown (sin bloques de código). Solo el JSON crudo.";
         
         const promptText = `${systemInstruction}\n\nTexto del diario:\n\n${truncatedText}`;
-
-        const modelToUse = document.getElementById('modelSelector')?.value || 'models/gemini-1.5-flash';
-        console.log(`[AI Import] Using model: ${modelToUse}`);
+        console.log(`[AI Import] Using selected model: ${selectedModel}`);
         
-        // Dynamic URL based on selector
-        const url = `https://generativelanguage.googleapis.com/v1beta/${modelToUse}:generateContent?key=${apiKey}`;
+        const url = `https://generativelanguage.googleapis.com/v1beta/${selectedModel}:generateContent?key=${apiKey}`;
 
         const response = await fetch(url, {
             method: 'POST',
@@ -1684,4 +1694,11 @@ document.addEventListener('DOMContentLoaded', () => {
     // Other listeners already initialized at top-level or other DOMContentLoaded blocks
     const aiBtn = document.getElementById('aiFormatBtn');
     if (aiBtn) aiBtn.addEventListener('click', refineTextWithAI);
+
+    const modelSelector = document.getElementById('modelSelector');
+    if (modelSelector) {
+        modelSelector.addEventListener('change', (e) => {
+            localStorage.setItem('gemini_selected_model', e.target.value);
+        });
+    }
 });
