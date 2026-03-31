@@ -311,11 +311,19 @@ class DriveService {
                     `- Introducción: Resumen general y métricas globales.\n` +
                     `- Años (Pestañas principales): Resumen anual.\n` +
                     `- Meses (Subpestañas): Registros diarios detallados.\n\n` +
-                    `GUÍA PARA IA: Interpreta este diario como una evolución emocional y física. Las métricas del 1 al 10 indican el estado subjetivo del usuario en cada categoría.\n\n` +
+                    `GUÍA PARA IA: Interpreta este diario como una evolución emocional y física del usuario. Cada registro diario puede contener dos tipos de datos estructurados:\n\n` +
+                    `1. MÉTRICAS DE ESTADO (Escala 1 al 10):\n` +
+                    `- Ánimo: Estado emocional y psicológico general.\n` +
+                    `- Salud: Nivel de bienestar físico (sin enfermedades ni dolor).\n` +
+                    `- Actividad: Nivel de energía y movimiento realizado.\n\n` +
+                    `2. RASTREADORES PERSONALIZADOS (Al final de cada registro):\n` +
+                    `- Son variables personalizadas establecidas por el usuario para medir hábitos, eventos o confirmaciones. Pueden ser numéricas (Cifra) o booleanas (Sí/No). Si están en "Blanco" o "-", significa que no hay datos para ese día o el hábito fue omitido deliberadamente.\n\n` +
                     `MÉTRICAS GLOBALES (Media Histórica):\n` +
                     `- Ánimo: ${globalAvg.mood === 'null' ? 'null' : globalAvg.mood + '/10'}\n` +
                     `- Salud: ${globalAvg.health === 'null' ? 'null' : globalAvg.health + '/10'}\n` +
                     `- Actividad: ${globalAvg.activity === 'null' ? 'null' : globalAvg.activity + '/10'}`;
+
+
 
                 requests.push({
                     insertText: { 
