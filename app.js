@@ -8,6 +8,10 @@ let currentDate = new Date();
 let selectedDate = null;
 let activeFilter = 'average';
 let activeView = 'days';
+let metricsSkipped = false;
+let customFieldsConfig = JSON.parse(localStorage.getItem('journAI_custom_fields') || '[]');
+let modalVisitedCustomStore = false; // Internal flag to track if custom fields screen was visited
+
 
 // State management (LocalStorage)
 function getEntries() {
@@ -869,14 +873,20 @@ if (writeTodayBtn) writeTodayBtn.addEventListener('click', () => {
 
 function showStep(step) {
     const step1 = document.getElementById('step1');
+    const stepCustom = document.getElementById('stepCustom');
     const step2 = document.getElementById('step2');
-    if (!step1 || !step2) return;
+    if (!step1 || !stepCustom || !step2) return;
+    
+    // Hide all
+    [step1, stepCustom, step2].forEach(s => s.classList.remove('active'));
     
     if (step === 1) {
         step1.classList.add('active');
-        step2.classList.remove('active');
-    } else {
-        step1.classList.remove('active');
+    } else if (step === 'custom') {
+        stepCustom.classList.add('active');
+        modalVisitedCustomStore = true;
+        renderCustomFieldsEntry();
+    } else if (step === 2) {
         step2.classList.add('active');
     }
 }
@@ -887,7 +897,20 @@ function closeModal() {
 }
 
 const nxtStepBtn = document.getElementById('nextStep');
-if (nxtStepBtn) nxtStepBtn.addEventListener('click', () => showStep(2));
+if (nxtStepBtn) nxtStepBtn.addEventListener('click', () => {
+    metricsSkipped = false;
+    showStep(2);
+    if (entryText) entryText.focus();
+});
+
+const nextToTextBtn = document.getElementById('nextToText');
+if (nextToTextBtn) nextToTextBtn.addEventListener('click', () => {
+    showStep(2);
+    if (entryText) entryText.focus();
+});
+
+const backToMetricsBtn = document.getElementById('backToMetrics');
+if (backToMetricsBtn) backToMetricsBtn.addEventListener('click', () => showStep(1));
 
 const prvStepBtn = document.getElementById('prevStep');
 if (prvStepBtn) prvStepBtn.addEventListener('click', () => showStep(1));
@@ -909,6 +932,8 @@ function checkTodayEntry() {
 
 function openModal(date) {
     selectedDate = date;
+    metricsSkipped = false;
+    modalVisitedCustomStore = false;
     const entries = getEntries();
     const dateKey = getDateKey(date);
     const entry = entries[dateKey];
@@ -938,24 +963,39 @@ function openModal(date) {
     
     showStep(1);
     if (entryModal) entryModal.classList.remove('hidden');
-    if (entryText) entryText.focus();
 }
 
 const saveEntryBtn = document.getElementById('saveEntry');
 if (saveEntryBtn) saveEntryBtn.addEventListener('click', () => {
     if (selectedDate) {
-        saveEntry(getDateKey(selectedDate), entryText.value, parseInt(moodSlider.value), parseInt(activitySlider.value), parseInt(healthSlider.value));
+        const m = metricsSkipped ? null : parseInt(moodSlider.value);
+        const a = metricsSkipped ? null : parseInt(activitySlider.value);
+        const h = metricsSkipped ? null : parseInt(healthSlider.value);
+        
+        let finalFormText = entryText.value;
+        
+        // Append Custom Info if visited and has values
+        if (modalVisitedCustomStore) {
+            const customInfo = collectCustomData();
+            if (customInfo && customInfo.length > 0) {
+                const separator = "\n\n---\nInformación Adicional:\n";
+                // Avoid duplicating if already present (e.g. on re-save)
+                if (!finalFormText.includes(separator.trim())) {
+                    finalFormText += separator + customInfo;
+                }
+            }
+        }
+        
+        saveEntry(getDateKey(selectedDate), finalFormText, m, a, h);
         closeModal();
     }
 });
 
 const skipMoodBtn = document.getElementById('skipMoodBtn');
 if (skipMoodBtn) skipMoodBtn.addEventListener('click', () => {
-    if (selectedDate) {
-        // Save only text, pass null for metrics
-        saveEntry(getDateKey(selectedDate), entryText.value, null, null, null);
-        closeModal();
-    }
+    metricsSkipped = true;
+    showStep(2);
+    if (entryText) entryText.focus();
 });
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -1025,6 +1065,7 @@ if (settingsBtn) settingsBtn.addEventListener('click', () => {
             geminiApiKeyInput.value = localStorage.getItem('gemini_api_key') || '';
         }
         fetchGeminiModels(); // Fetch available models when opening settings
+        renderCustomFieldsConfig(); // Render the dynamic fields in settings
     }
 });
 
@@ -1111,9 +1152,9 @@ const mainContent = document.querySelector('.main-content');
 const sidebar = document.querySelector('.sidebar');
 
 window.addEventListener('touchstart', (e) => {
-    // Disable PTR if any modal is open
+    // If a modal is open, we only allow gestures if it's the entryModal
     const isModalOpen = document.querySelector('.modal:not(.hidden), .modal-overlay:not(.hidden)');
-    if (isModalOpen) return;
+    if (isModalOpen && isModalOpen.id !== 'entryModal') return;
 
     if (window.scrollY === 0) {
         touchStartX = e.touches[0].pageX;
@@ -1158,6 +1199,7 @@ window.addEventListener('touchend', (e) => {
     const deltaX = touchEndX - touchStartX;
     const deltaY = touchEndY - touchStartY;
     const isModalOpen = document.querySelector('.modal:not(.hidden), .modal-overlay:not(.hidden)');
+    const isEntryModal = isModalOpen && isModalOpen.id === 'entryModal';
 
     // Vertical Pull to Refresh logic
     if (pullDistance > PTR_THRESHOLD && !isModalOpen) {
@@ -1193,7 +1235,23 @@ window.addEventListener('touchend', (e) => {
         }
     }
 
-    // Always reset visual indicator and state variables
+    // Vertical Swipe logic (Swipe Up for Custom step, Swipe Down to go back)
+    if (isEntryModal && Math.abs(deltaY) > 70 && Math.abs(deltaY) > Math.abs(deltaX) * 1.5) {
+        const step1 = document.getElementById('step1');
+        const stepCustom = document.getElementById('stepCustom');
+        
+        if (deltaY < -70) { // Swipe Up
+            if (step1 && step1.classList.contains('active')) {
+                showStep('custom');
+            }
+        } else if (deltaY > 70) { // Swipe Down
+            if (stepCustom && stepCustom.classList.contains('active')) {
+                showStep(1);
+            }
+        }
+    }
+    
+    // Reset visual indicator and state variables
     if (pullDistance <= PTR_THRESHOLD) {
         if (ptrIndicator) {
             ptrIndicator.style.transition = 'transform 0.4s cubic-bezier(0.23, 1, 0.32, 1), opacity 0.3s ease';
@@ -1206,6 +1264,96 @@ window.addEventListener('touchend', (e) => {
     touchStartPos = 0;
     pullDistance = 0;
 }, { passive: false });
+
+// --- CUSTOM FIELDS LOGIC ---
+function renderCustomFieldsConfig() {
+    const list = document.getElementById('customFieldsList');
+    if (!list) return;
+    list.innerHTML = '';
+    
+    customFieldsConfig.forEach((field, index) => {
+        const row = document.createElement('div');
+        row.className = 'config-field-row';
+        row.innerHTML = `
+            <input type="text" class="config-input" value="${field.label}" placeholder="Nombre del campo" onchange="updateCustomField(${index}, 'label', this.value)">
+            <select class="config-select" onchange="updateCustomField(${index}, 'type', this.value)">
+                <option value="checkbox" ${field.type === 'checkbox' ? 'selected' : ''}>Sí/No</option>
+                <option value="number" ${field.type === 'number' ? 'selected' : ''}>Cifra</option>
+            </select>
+            <button class="remove-field-btn" onclick="removeCustomField(${index})">×</button>
+        `;
+        list.appendChild(row);
+    });
+}
+
+window.updateCustomField = (index, key, value) => {
+    customFieldsConfig[index][key] = value;
+    localStorage.setItem('journAI_custom_fields', JSON.stringify(customFieldsConfig));
+};
+
+window.removeCustomField = (index) => {
+    customFieldsConfig.splice(index, 1);
+    localStorage.setItem('journAI_custom_fields', JSON.stringify(customFieldsConfig));
+    renderCustomFieldsConfig();
+};
+
+const addCustomFieldBtn = document.getElementById('addCustomFieldBtn');
+if (addCustomFieldBtn) {
+    addCustomFieldBtn.addEventListener('click', () => {
+        customFieldsConfig.push({ label: 'Nuevo Campo', type: 'checkbox' });
+        localStorage.setItem('journAI_custom_fields', JSON.stringify(customFieldsConfig));
+        renderCustomFieldsConfig();
+    });
+}
+
+function renderCustomFieldsEntry() {
+    const container = document.getElementById('customFieldsContainer');
+    if (!container) return;
+    container.innerHTML = '';
+    
+    if (customFieldsConfig.length === 0) {
+        container.innerHTML = '<p class="info-text">No has configurado campos adicionales en Ajustes.</p>';
+        return;
+    }
+    
+    customFieldsConfig.forEach((field, index) => {
+        const item = document.createElement('div');
+        item.className = 'custom-field-item';
+        const inputId = `customField_${index}`;
+        
+        if (field.type === 'checkbox') {
+            item.innerHTML = `
+                <label for="${inputId}">${field.label}</label>
+                <div class="custom-field-input-wrapper">
+                    <input type="checkbox" id="${inputId}" class="custom-checkbox">
+                </div>
+            `;
+        } else {
+            item.innerHTML = `
+                <label for="${inputId}">${field.label}</label>
+                <div class="custom-field-input-wrapper">
+                    <input type="number" id="${inputId}" class="custom-number-input" placeholder="0">
+                </div>
+            `;
+        }
+        container.appendChild(item);
+    });
+}
+
+function collectCustomData() {
+    let output = '';
+    customFieldsConfig.forEach((field, index) => {
+        const input = document.getElementById(`customField_${index}`);
+        if (!input) return;
+        
+        if (field.type === 'checkbox' && input.checked) {
+            output += `• ${field.label}: Sí\n`;
+        } else if (field.type === 'number' && input.value !== '') {
+            output += `• ${field.label}: ${input.value}\n`;
+        }
+    });
+    return output.trim();
+}
 
 // --- HIGHLIGHTS (DESTACADOS) LOGIC ---
 function calculateHighlights() {
