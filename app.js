@@ -930,7 +930,8 @@ function saveTrackersState() {
     const inputs = container.querySelectorAll('.tracker-val');
     inputs.forEach(input => {
         const id = input.dataset.id;
-        activeTrackersState[id] = input.value;
+        // Readings depend on the type container attached to dataset.value
+        activeTrackersState[id] = input.dataset.value || '';
     });
 }
 
@@ -1208,20 +1209,62 @@ function renderActiveTrackers() {
         if (t.type === 'boolean') {
             div.innerHTML = `
                 <label>${t.name}</label>
-                <select class="action-select-premium tracker-val tracker-dropdown" data-id="${t.id}" data-name="${t.name}">
-                    <option value="" ${currentVal === '' ? 'selected' : ''}>-</option>
-                    <option value="Sí" ${currentVal === 'Sí' ? 'selected' : ''}>Sí</option>
-                    <option value="No" ${currentVal === 'No' ? 'selected' : ''}>No</option>
-                </select>
+                <div class="segmented-control tracker-val" data-id="${t.id}" data-name="${t.name}" data-type="boolean" data-value="${currentVal}">
+                    <button class="segment-btn ${currentVal === 'Sí' ? 'active' : ''}" data-val="Sí">Sí</button>
+                    <button class="segment-btn ${currentVal === '' ? 'active' : ''}" data-val="">-</button>
+                    <button class="segment-btn ${currentVal === 'No' ? 'active' : ''}" data-val="No">No</button>
+                </div>
             `;
         } else {
             div.innerHTML = `
                 <label>${t.name}</label>
-                <input type="number" class="tracker-num-input tracker-val" data-id="${t.id}" data-name="${t.name}" placeholder="0" value="${currentVal}">
+                <div class="number-stepper tracker-val" data-id="${t.id}" data-name="${t.name}" data-type="number" data-value="${currentVal}">
+                    <button class="stepper-btn dec">-</button>
+                    <input type="number" class="stepper-input" placeholder="-" value="${currentVal}">
+                    <button class="stepper-btn inc">+</button>
+                </div>
             `;
         }
         
         container.appendChild(div);
+    });
+
+    // Attach Interactivity for Trackers
+    container.querySelectorAll('.segmented-control').forEach(seg => {
+        const btns = seg.querySelectorAll('.segment-btn');
+        btns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                btns.forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                seg.dataset.value = btn.dataset.val;
+            });
+        });
+    });
+
+    container.querySelectorAll('.number-stepper').forEach(step => {
+        const input = step.querySelector('.stepper-input');
+        const btnDec = step.querySelector('.dec');
+        const btnInc = step.querySelector('.inc');
+
+        const updateVal = (newVal) => {
+            if (newVal === '' || isNaN(newVal)) newVal = '';
+            input.value = newVal;
+            step.dataset.value = newVal;
+        };
+
+        input.addEventListener('input', (e) => updateVal(e.target.value));
+
+        btnDec.addEventListener('click', () => {
+            let val = parseInt(input.value);
+            if (isNaN(val)) val = 0;
+            updateVal(val - 1);
+        });
+
+        btnInc.addEventListener('click', () => {
+            let val = parseInt(input.value);
+            if (isNaN(val)) val = 0;
+            updateVal(val + 1);
+        });
     });
 }
 

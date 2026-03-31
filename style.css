@@ -1627,47 +1627,84 @@ input[type="range"]::-webkit-slider-thumb {
   font-weight: 500;
 }
 
-/* Tracker Dropdown */
-.tracker-dropdown {
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  color: #fff;
-  padding: 0.5rem 1rem;
+/* Segmented Control (Boolean Toggle) */
+.segmented-control {
+  display: flex;
+  background: rgba(255, 255, 255, 0.05);
   border-radius: var(--radius-sm);
-  font-size: 1rem;
-  font-family: inherit;
-  outline: none;
+  padding: 4px;
+  gap: 4px;
+}
+
+.segment-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  padding: 0.4rem 0.8rem;
+  border-radius: calc(var(--radius-sm) - 2px);
   cursor: pointer;
-  appearance: none; /* remove default arrow */
-  min-width: 100px;
-  text-align: center;
+  font-size: 0.9rem;
+  font-weight: 500;
+  transition: var(--transition-smooth);
 }
 
-.tracker-dropdown:focus {
-  border-color: var(--accent-color);
+.segment-btn:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-primary);
 }
 
-.tracker-dropdown option {
-  background: var(--bg-card);
+.segment-btn.active {
+  background: var(--accent-color);
   color: #fff;
+  box-shadow: var(--shadow-sm);
 }
 
-/* Number Input */
-.tracker-num-input {
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  color: #fff;
-  padding: 0.5rem;
+/* Number Stepper */
+.number-stepper {
+  display: flex;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.05);
   border-radius: var(--radius-sm);
-  width: 80px;
-  text-align: center;
-  font-size: 1.1rem;
-  font-family: inherit;
+  overflow: hidden;
 }
 
-.tracker-num-input:focus {
+.stepper-btn {
+  background: rgba(255, 255, 255, 0.05);
+  border: none;
+  color: #fff;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 1.2rem;
+  transition: var(--transition-smooth);
+}
+
+.stepper-btn:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.stepper-input {
+  background: transparent;
+  border: none;
+  color: #fff;
+  width: 50px;
+  text-align: center;
+  font-size: 1rem;
+  font-weight: 500;
+  font-family: inherit;
   outline: none;
-  border-color: var(--accent-color);
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+.stepper-input::-webkit-outer-spin-button,
+.stepper-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  appearance: none;
+  margin: 0;
 }
 
 /* Swipe Indicator */
