@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>JournAI - Diario Estelar</title>
-    <link rel="stylesheet" href="style.css?v=40">
+    <link rel="stylesheet" href="style.css?v=21">
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#0a0a0a">
     <link rel="apple-touch-icon" href="icon-192.png">
@@ -177,24 +177,28 @@
                             </div>
                         </div>
 
-                        <!-- Section: Custom Fields -->
+                        <!-- Section: Custom Trackers -->
                         <div class="settings-card glass-card-dark">
                             <div class="card-header">
-                                <span class="card-icon">🏷️</span>
+                                <span class="card-icon">✅</span>
                                 <div class="card-title-group">
-                                    <h3>Campos Dinámicos</h3>
-                                    <p>Configura campos adicionales (Sí/No o Cifra) para tus registros estelares.</p>
+                                    <h3>Rastreadores Personalizados</h3>
+                                    <p>Configura hábitos o métricas que quieras añadir a tus entradas diarias (ej. Gimnasio, Litros de agua).</p>
                                 </div>
                             </div>
-                            <div id="customFieldsList" class="custom-fields-config-list">
-                                <!-- Dynamic Fields Config -->
-                            </div>
-                            <button id="addCustomFieldBtn" class="action-btn-premium highlight-alt">
-                                <span class="btn-icon">✚</span>
-                                <div class="btn-text">
-                                    <span class="btn-title">Añadir Nuevo Campo</span>
+                            <div class="settings-actions">
+                                <div class="tracker-config-form">
+                                    <input type="text" id="newTrackerName" class="action-input-premium" placeholder="Nombre (ej. Gimnasio)">
+                                    <select id="newTrackerType" class="action-select-premium">
+                                        <option value="boolean">Sí / No</option>
+                                        <option value="number">Cifra (Número)</option>
+                                    </select>
+                                    <button id="addTrackerBtn" class="primary-btn-outline" style="min-width: 80px;">Añadir</button>
                                 </div>
-                            </button>
+                                <div id="trackersList" class="trackers-list">
+                                    <!-- Trackers will be injected here -->
+                                </div>
+                            </div>
                         </div>
 
                         <!-- Section: Cloud Sync -->
@@ -275,7 +279,6 @@
                 <div id="step1" class="entry-step active">
                     <div class="step1-header">
                         <button id="skipMoodBtn" class="skip-btn-premium">Saltar →</button>
-                        <div class="swipe-hint">Más detalles ↑</div>
                     </div>
                     
                     <section class="reflection-main">
@@ -298,30 +301,31 @@
                         </div>
                     </section>
                     <footer class="modal-footer">
-                        <button id="nextStep" class="primary-btn">
-                            <span>Siguiente</span>
-                            <span>→</span>
-                        </button>
+                        <div class="swipe-indicator" id="swipeUpIndicator">
+                            <span>Desliza para Rastreadores</span>
+                            <div class="chevron"></div>
+                        </div>
                     </footer>
                 </div>
 
-                <!-- Step 1.5: Custom Fields -->
-                <div id="stepCustom" class="entry-step">
-                    <div class="stepCustom-header">
-                        <button class="back-btn" id="backToMetrics">← Métricas</button>
+                <!-- Step 1b: Custom Trackers -->
+                <div id="step1b" class="entry-step">
+                    <div class="step1-header">
+                        <button class="back-btn" id="prevStepFrom1b">← Atrás</button>
+                        <button id="skipTrackersBtn" class="skip-btn-premium">Saltar →</button>
                     </div>
                     
-                    <section class="custom-fields-main">
+                    <section class="reflection-main">
                         <header class="modal-header">
-                            <h3>Información Extra</h3>
+                            <h3>Rastreadores</h3>
                         </header>
-                        <div id="customFieldsContainer" class="custom-fields-entry-container">
-                            <!-- Inputs generated by JS -->
+                        <div id="activeTrackersContainer" class="metrics-container trackers-container">
+                            <!-- Active trackers injected here -->
                         </div>
                     </section>
                     <footer class="modal-footer">
-                        <button id="nextToText" class="primary-btn">
-                            <span>Continuar</span>
+                        <button id="nextStepFrom1b" class="primary-btn">
+                            <span>Siguiente</span>
                             <span>→</span>
                         </button>
                     </footer>

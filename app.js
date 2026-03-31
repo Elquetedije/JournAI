@@ -9,11 +9,10 @@ let selectedDate = null;
 let activeFilter = 'average';
 let activeView = 'days';
 let metricsSkipped = false;
-let customFieldsConfig = JSON.parse(localStorage.getItem('journAI_custom_fields') || '[]');
-let modalVisitedCustomStore = false; // Internal flag to track if custom fields screen was visited
 
+// Tracker Management
+let trackersConfig = JSON.parse(localStorage.getItem('journAI_trackers_config')) || [];
 
-// State management (LocalStorage)
 function getEntries() {
     return JSON.parse(localStorage.getItem('journAI_entries') || '{}');
 }
@@ -873,19 +872,19 @@ if (writeTodayBtn) writeTodayBtn.addEventListener('click', () => {
 
 function showStep(step) {
     const step1 = document.getElementById('step1');
-    const stepCustom = document.getElementById('stepCustom');
+    const step1b = document.getElementById('step1b');
     const step2 = document.getElementById('step2');
-    if (!step1 || !stepCustom || !step2) return;
+    if (!step1 || !step1b || !step2) return;
     
-    // Hide all
-    [step1, stepCustom, step2].forEach(s => s.classList.remove('active'));
-    
+    step1.classList.remove('active');
+    step1b.classList.remove('active');
+    step2.classList.remove('active');
+
     if (step === 1) {
         step1.classList.add('active');
-    } else if (step === 'custom') {
-        stepCustom.classList.add('active');
-        modalVisitedCustomStore = true;
-        renderCustomFieldsEntry();
+    } else if (step === '1b') {
+        renderActiveTrackers();
+        step1b.classList.add('active');
     } else if (step === 2) {
         step2.classList.add('active');
     }
@@ -896,7 +895,114 @@ function closeModal() {
     showStep(1);
 }
 
-// Consolidated navigation listeners at the end of the file
+const nxtStepBtnFrom1b = document.getElementById('nextStepFrom1b');
+const nxtStepBtn = document.getElementById('nextStep'); // To text
+const prvStepBtn = document.getElementById('prevStep'); // Back from Text
+const prvStepBtnFrom1b = document.getElementById('prevStepFrom1b'); // Back from Trackers
+const skipTrackersBtn = document.getElementById('skipTrackersBtn');
+const swipeUpIndicator = document.getElementById('swipeUpIndicator');
+
+if (swipeUpIndicator) {
+    swipeUpIndicator.addEventListener('click', () => showStep('1b'));
+}
+
+if (prvStepBtnFrom1b) {
+    prvStepBtnFrom1b.addEventListener('click', () => showStep(1));
+}
+
+if (nxtStepBtn) { // from step 1
+    nxtStepBtn.addEventListener('click', () => {
+        metricsSkipped = false;
+        showStep(2);
+        if (entryText) entryText.focus();
+    });
+}
+
+function injectTrackers() {
+    const container = document.getElementById('activeTrackersContainer');
+    if (!container || !entryText) return;
+    
+    const inputs = container.querySelectorAll('.tracker-val');
+    let hasValues = false;
+    let trackerText = "\n\n--- Rastreadores ---\n";
+    
+    inputs.forEach(input => {
+        const name = input.dataset.name;
+        const type = input.dataset.type;
+        let valueStr = '';
+        
+        if (type === 'boolean') {
+            valueStr = input.checked ? 'Sí' : 'No';
+            hasValues = true;
+        } else if (type === 'number') {
+            if (input.value.trim() !== '') {
+                valueStr = input.value;
+                hasValues = true;
+            }
+        }
+        if (valueStr !== '') {
+            trackerText += `- ${name}: ${valueStr}\n`;
+        }
+    });
+    
+    if (!hasValues) return;
+    
+    // Check if trackers block already exists, if so replace it, else append
+    const currentText = entryText.value;
+    const blockStart = currentText.indexOf('\n\n--- Rastreadores ---');
+    if (blockStart !== -1) {
+        // Replace existing block
+        entryText.value = currentText.substring(0, blockStart) + trackerText;
+    } else {
+        // Append
+        entryText.value = currentText + trackerText;
+    }
+}
+
+if (nxtStepBtnFrom1b) {
+    nxtStepBtnFrom1b.addEventListener('click', () => {
+        injectTrackers();
+        showStep(2);
+        if (entryText) entryText.focus();
+    });
+}
+
+if (skipTrackersBtn) {
+    skipTrackersBtn.addEventListener('click', () => {
+        showStep(2);
+        if (entryText) entryText.focus();
+    });
+}
+
+if (prvStepBtn) prvStepBtn.addEventListener('click', () => showStep('1b'));
+
+// Modal Swipe Events for Step1 -> Step1b
+let modalTouchStartY = 0;
+const step1 = document.getElementById('step1');
+const step1b = document.getElementById('step1b');
+
+if (step1) {
+    step1.addEventListener('touchstart', e => modalTouchStartY = e.touches[0].pageY, {passive: true});
+    step1.addEventListener('touchend', e => {
+        if (modalTouchStartY === 0) return;
+        const deltaY = e.changedTouches[0].pageY - modalTouchStartY;
+        // Swipe Up -> go to 1b
+        if (deltaY < -40) {
+            showStep('1b');
+        }
+    });
+}
+if (step1b) {
+    step1b.addEventListener('touchstart', e => modalTouchStartY = e.touches[0].pageY, {passive: true});
+    step1b.addEventListener('touchend', e => {
+        if (modalTouchStartY === 0) return;
+        const deltaY = e.changedTouches[0].pageY - modalTouchStartY;
+        // Swipe Down -> go back to 1
+        if (deltaY > 50) {
+            showStep(1);
+        }
+    });
+}
 
 function checkTodayEntry() {
     const entries = getEntries();
@@ -916,7 +1022,6 @@ function checkTodayEntry() {
 function openModal(date) {
     selectedDate = date;
     metricsSkipped = false;
-    modalVisitedCustomStore = false;
     const entries = getEntries();
     const dateKey = getDateKey(date);
     const entry = entries[dateKey];
@@ -954,39 +1059,36 @@ if (saveEntryBtn) saveEntryBtn.addEventListener('click', () => {
         const m = metricsSkipped ? null : parseInt(moodSlider.value);
         const a = metricsSkipped ? null : parseInt(activitySlider.value);
         const h = metricsSkipped ? null : parseInt(healthSlider.value);
-        
-        let finalFormText = entryText.value;
-        
-        // Append Custom Info if visited and has values
-        if (modalVisitedCustomStore) {
-            const customInfo = collectCustomData();
-            if (customInfo && customInfo.length > 0) {
-                const separator = "\n\n---\nInformación Adicional:\n";
-                // Avoid duplicating if already present (e.g. on re-save)
-                if (!finalFormText.includes(separator.trim())) {
-                    finalFormText += separator + customInfo;
-                }
-            }
-        }
-        
-        saveEntry(getDateKey(selectedDate), finalFormText, m, a, h);
+        saveEntry(getDateKey(selectedDate), entryText.value, m, a, h);
         closeModal();
     }
 });
 
-document.addEventListener('DOMContentLoaded', () => {
-    const skipMoodBtn = document.getElementById('skipMoodBtn');
-    if (skipMoodBtn) skipMoodBtn.addEventListener('click', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        metricsSkipped = true;
-        // Skip metrics and custom fields, go directly to text
-        showStep(2);
-        if (entryText) entryText.focus();
-    });
+const skipMoodBtn = document.getElementById('skipMoodBtn');
+if (skipMoodBtn) skipMoodBtn.addEventListener('click', () => {
+    metricsSkipped = true;
+    showStep(2);
+    if (entryText) entryText.focus();
 });
 
-// Delete button listener consolidated at the end of the file
+document.addEventListener('DOMContentLoaded', () => {
+    const deleteEntryBtn = document.getElementById('deleteEntry');
+    if (deleteEntryBtn) {
+        console.log('[JournAI] Delete button found, attaching listener');
+        deleteEntryBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            const dateKey = selectedDate ? getDateKey(selectedDate) : null;
+            console.log('[JournAI] Delete button clicked', { selectedDate, dateKey });
+            
+            if (dateKey && deleteEntry(dateKey)) {
+                console.log('[JournAI] Entry deleted successfully');
+                closeModal();
+            } else if (!dateKey) {
+                console.error('[JournAI] Delete failed: No selectedDate');
+            }
+        });
+    }
+});
 
 function getEntriesGrouped() {
     const entries = getEntries();
@@ -1035,14 +1137,105 @@ if (settingsBtn) settingsBtn.addEventListener('click', () => {
         if (geminiApiKeyInput) {
             geminiApiKeyInput.value = localStorage.getItem('gemini_api_key') || '';
         }
+        renderTrackerConfigList();
         fetchGeminiModels(); // Fetch available models when opening settings
-        renderCustomFieldsConfig(); // Render the dynamic fields in settings
     }
 });
 
 if (geminiApiKeyInput) {
     geminiApiKeyInput.addEventListener('input', (e) => {
         localStorage.setItem('gemini_api_key', e.target.value.trim());
+    });
+}
+
+// --- SETTINGS: TRACKERS ---
+function saveTrackersConfig() {
+    localStorage.setItem('journAI_trackers_config', JSON.stringify(trackersConfig));
+}
+
+function renderTrackerConfigList() {
+    const list = document.getElementById('trackersList');
+    if (!list) return;
+    list.innerHTML = '';
+    
+    if (trackersConfig.length === 0) {
+        list.innerHTML = '<p style="color:var(--text-secondary); font-size:0.85rem; padding-left:5px;">Aún no has configurado rastreadores.</p>';
+        return;
+    }
+    
+    trackersConfig.forEach(t => {
+        const div = document.createElement('div');
+        div.className = 'tracker-item-row';
+        div.innerHTML = `
+            <div class="tracker-item-info">
+                <span class="tracker-item-name">${t.name}</span>
+                <span class="tracker-item-type">${t.type === 'boolean' ? 'Sí / No' : 'Cifra'}</span>
+            </div>
+            <button class="delete-tracker-btn" data-id="${t.id}" title="Eliminar">×</button>
+        `;
+        list.appendChild(div);
+    });
+    
+    document.querySelectorAll('.delete-tracker-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const id = e.currentTarget.dataset.id;
+            trackersConfig = trackersConfig.filter(t => t.id !== id);
+            saveTrackersConfig();
+            renderTrackerConfigList();
+        });
+    });
+}
+
+const addTrackerBtn = document.getElementById('addTrackerBtn');
+if (addTrackerBtn) {
+    addTrackerBtn.addEventListener('click', () => {
+        const nameInput = document.getElementById('newTrackerName');
+        const typeSelect = document.getElementById('newTrackerType');
+        const name = nameInput.value.trim();
+        if (!name) return alert('Ponle un nombre al rastreador.');
+        
+        trackersConfig.push({
+            id: 't_' + Date.now(),
+            name: name,
+            type: typeSelect.value
+        });
+        
+        saveTrackersConfig();
+        renderTrackerConfigList();
+        nameInput.value = '';
+    });
+}
+
+function renderActiveTrackers() {
+    const container = document.getElementById('activeTrackersContainer');
+    if (!container) return;
+    container.innerHTML = '';
+    
+    if (trackersConfig.length === 0) {
+        container.innerHTML = '<p style="color:var(--text-secondary); text-align:center; padding: 2rem;">No tienes rastreadores configurados.<br>Puedes añadirlos desde Ajustes.</p>';
+        return;
+    }
+    
+    trackersConfig.forEach(t => {
+        const div = document.createElement('div');
+        div.className = 'tracker-input-row';
+        
+        if (t.type === 'boolean') {
+            div.innerHTML = `
+                <label>${t.name}</label>
+                <label class="tracker-toggle">
+                    <input type="checkbox" class="tracker-val" data-type="boolean" data-name="${t.name}">
+                    <span class="toggle-slider"></span>
+                </label>
+            `;
+        } else {
+            div.innerHTML = `
+                <label>${t.name}</label>
+                <input type="number" class="tracker-num-input tracker-val" data-type="number" data-name="${t.name}" placeholder="0">
+            `;
+        }
+        
+        container.appendChild(div);
     });
 }
 
@@ -1123,20 +1316,15 @@ const mainContent = document.querySelector('.main-content');
 const sidebar = document.querySelector('.sidebar');
 
 window.addEventListener('touchstart', (e) => {
+    // Disable PTR if any modal is open
     const isModalOpen = document.querySelector('.modal:not(.hidden), .modal-overlay:not(.hidden)');
-    // If a modal is open, we ONLY allow gestures if it's the entryModal
-    if (isModalOpen && isModalOpen.id !== 'entryModal') return;
+    if (isModalOpen) return;
 
-    touchStartX = e.touches[0].pageX;
-    touchStartY = e.touches[0].pageY;
-    if (window.scrollY === 0 || isModalOpen) {
+    if (window.scrollY === 0) {
+        touchStartX = e.touches[0].pageX;
+        touchStartY = e.touches[0].pageY;
         touchStartPos = e.touches[0].pageY;
-    } else {
-        touchStartPos = 0;
-    }
-    
-    // Disable transitions during pull
-    if (!isModalOpen) {
+        // Disable transitions during pull
         if (mainContent) mainContent.style.transition = 'none';
         if (sidebar) sidebar.style.transition = 'none';
     }
@@ -1175,7 +1363,6 @@ window.addEventListener('touchend', (e) => {
     const deltaX = touchEndX - touchStartX;
     const deltaY = touchEndY - touchStartY;
     const isModalOpen = document.querySelector('.modal:not(.hidden), .modal-overlay:not(.hidden)');
-    const isEntryModal = isModalOpen && isModalOpen.id === 'entryModal';
 
     // Vertical Pull to Refresh logic
     if (pullDistance > PTR_THRESHOLD && !isModalOpen) {
@@ -1211,24 +1398,7 @@ window.addEventListener('touchend', (e) => {
         }
     }
 
-    // Vertical Swipe logic (Swipe Up for Custom step, Swipe Down to go back)
-    // Detection is more permissive now (40px threshold)
-    if (isEntryModal && Math.abs(deltaY) > 40 && Math.abs(deltaY) > Math.abs(deltaX)) {
-        const step1 = document.getElementById('step1');
-        const stepCustom = document.getElementById('stepCustom');
-        
-        if (deltaY < -40) { // Swipe Up -> Only works from Metrics
-            if (step1 && step1.classList.contains('active')) {
-                showStep('custom');
-            }
-        } else if (deltaY > 40) { // Swipe Down -> Goes back to Metrics from wherever we are
-            if (stepCustom && stepCustom.classList.contains('active')) {
-                showStep(1);
-            }
-        }
-    }
-    
-    // Reset visual indicator and state variables
+    // Always reset visual indicator and state variables
     if (pullDistance <= PTR_THRESHOLD) {
         if (ptrIndicator) {
             ptrIndicator.style.transition = 'transform 0.4s cubic-bezier(0.23, 1, 0.32, 1), opacity 0.3s ease';
@@ -1241,87 +1411,6 @@ window.addEventListener('touchend', (e) => {
     touchStartPos = 0;
     pullDistance = 0;
 }, { passive: false });
-
-// --- CUSTOM FIELDS LOGIC ---
-function renderCustomFieldsConfig() {
-    const list = document.getElementById('customFieldsList');
-    if (!list) return;
-    list.innerHTML = '';
-    
-    customFieldsConfig.forEach((field, index) => {
-        const row = document.createElement('div');
-        row.className = 'config-field-row';
-        row.innerHTML = `
-            <input type="text" class="config-input" value="${field.label}" placeholder="Nombre del campo" onchange="updateCustomField(${index}, 'label', this.value)">
-            <select class="config-select" onchange="updateCustomField(${index}, 'type', this.value)">
-                <option value="checkbox" ${field.type === 'checkbox' ? 'selected' : ''}>Sí/No</option>
-                <option value="number" ${field.type === 'number' ? 'selected' : ''}>Cifra</option>
-            </select>
-            <button class="remove-field-btn" onclick="removeCustomField(${index})">×</button>
-        `;
-        list.appendChild(row);
-    });
-}
-
-window.updateCustomField = (index, key, value) => {
-    customFieldsConfig[index][key] = value;
-    localStorage.setItem('journAI_custom_fields', JSON.stringify(customFieldsConfig));
-};
-
-window.removeCustomField = (index) => {
-    customFieldsConfig.splice(index, 1);
-    localStorage.setItem('journAI_custom_fields', JSON.stringify(customFieldsConfig));
-    renderCustomFieldsConfig();
-};
-
-function renderCustomFieldsEntry() {
-    const container = document.getElementById('customFieldsContainer');
-    if (!container) return;
-    container.innerHTML = '';
-    
-    if (customFieldsConfig.length === 0) {
-        container.innerHTML = '<p class="info-text">No has configurado campos adicionales en Ajustes.</p>';
-        return;
-    }
-    
-    customFieldsConfig.forEach((field, index) => {
-        const item = document.createElement('div');
-        item.className = 'custom-field-item';
-        const inputId = `customField_${index}`;
-        
-        if (field.type === 'checkbox') {
-            item.innerHTML = `
-                <label for="${inputId}">${field.label}</label>
-                <div class="custom-field-input-wrapper">
-                    <input type="checkbox" id="${inputId}" class="custom-checkbox">
-                </div>
-            `;
-        } else {
-            item.innerHTML = `
-                <label for="${inputId}">${field.label}</label>
-                <div class="custom-field-input-wrapper">
-                    <input type="number" id="${inputId}" class="custom-number-input" placeholder="0">
-                </div>
-            `;
-        }
-        container.appendChild(item);
-    });
-}
-
-function collectCustomData() {
-    let output = '';
-    customFieldsConfig.forEach((field, index) => {
-        const input = document.getElementById(`customField_${index}`);
-        if (!input) return;
-        
-        if (field.type === 'checkbox' && input.checked) {
-            output += `• ${field.label}: Sí\n`;
-        } else if (field.type === 'number' && input.value !== '') {
-            output += `• ${field.label}: ${input.value}\n`;
-        }
-    });
-    return output.trim();
-}
 
 // --- HIGHLIGHTS (DESTACADOS) LOGIC ---
 function calculateHighlights() {
@@ -1422,56 +1511,8 @@ function closeHighlights() {
     if (modal) modal.classList.add('hidden');
 }
 
-// --- INITIALIZATION & GLOBAL LISTENERS (CONSOLIDATED) ---
+// Global Event Listeners for Highlights
 document.addEventListener('DOMContentLoaded', () => {
-    // Modal Navigation & Step Transitions
-    const nxtStepBtn = document.getElementById('nextStep');
-    if (nxtStepBtn) nxtStepBtn.addEventListener('click', (e) => {
-        e.preventDefault(); e.stopPropagation();
-        metricsSkipped = false;
-        showStep(2); // Goes to text input (as requested by user to skip custom fields in the normal flow)
-        if (entryText) entryText.focus();
-    });
-
-    const nextToTextBtn = document.getElementById('nextToText');
-    if (nextToTextBtn) nextToTextBtn.addEventListener('click', (e) => {
-        e.preventDefault(); e.stopPropagation();
-        showStep(2);
-        if (entryText) entryText.focus();
-    });
-
-    const backToMetricsBtn = document.getElementById('backToMetrics');
-    if (backToMetricsBtn) backToMetricsBtn.addEventListener('click', (e) => {
-        e.preventDefault(); e.stopPropagation();
-        showStep(1);
-    });
-
-    const prvStepBtn = document.getElementById('prevStep');
-    if (prvStepBtn) prvStepBtn.addEventListener('click', (e) => {
-        e.preventDefault(); e.stopPropagation();
-        showStep(1);
-    });
-
-    const skipMoodBtn = document.getElementById('skipMoodBtn');
-    if (skipMoodBtn) skipMoodBtn.addEventListener('click', (e) => {
-        e.preventDefault(); e.stopImmediatePropagation();
-        metricsSkipped = true;
-        showStep(2);
-        if (entryText) entryText.focus();
-    });
-
-    // Custom Fields Config (Settings)
-    const addCustomFieldBtn = document.getElementById('addCustomFieldBtn');
-    if (addCustomFieldBtn) {
-        addCustomFieldBtn.addEventListener('click', (e) => {
-            e.preventDefault(); e.stopPropagation();
-            customFieldsConfig.push({ label: 'Nuevo Campo', type: 'checkbox' });
-            localStorage.setItem('journAI_custom_fields', JSON.stringify(customFieldsConfig));
-            renderCustomFieldsConfig();
-        });
-    }
-
-    // Other Global Actions
     const highlightsBtn = document.getElementById('highlightsBtn');
     if (highlightsBtn) highlightsBtn.addEventListener('click', openHighlights);
     
@@ -1483,15 +1524,6 @@ document.addEventListener('DOMContentLoaded', () => {
         backToHighlightsBtn.addEventListener('click', () => {
             closeModal();
             openHighlights();
-        });
-    }
-
-    const deleteEntryBtn = document.getElementById('deleteEntry');
-    if (deleteEntryBtn) {
-        deleteEntryBtn.addEventListener('click', (e) => {
-            e.preventDefault();
-            const dateKey = selectedDate ? getDateKey(selectedDate) : null;
-            if (dateKey && deleteEntry(dateKey)) closeModal();
         });
     }
 });
@@ -1823,69 +1855,8 @@ async function handleDeleteAll() {
     }
 }
 
-// --- INITIALIZATION & GLOBAL LISTENERS (CONSOLIDATED) ---
+// Global Event Listeners Extension
 document.addEventListener('DOMContentLoaded', () => {
-    // Modal Navigation & Step Transitions
-    const nxtStepBtn = document.getElementById('nextStep');
-    if (nxtStepBtn) nxtStepBtn.addEventListener('click', (e) => {
-        e.preventDefault(); e.stopPropagation();
-        metricsSkipped = false;
-        showStep(2); // Goes to text input (as requested by user to skip custom fields in the normal flow)
-        if (entryText) entryText.focus();
-    });
-
-    const nextToTextBtn = document.getElementById('nextToText');
-    if (nextToTextBtn) nextToTextBtn.addEventListener('click', (e) => {
-        e.preventDefault(); e.stopPropagation();
-        showStep(2);
-        if (entryText) entryText.focus();
-    });
-
-    const backToMetricsBtn = document.getElementById('backToMetrics');
-    if (backToMetricsBtn) backToMetricsBtn.addEventListener('click', (e) => {
-        e.preventDefault(); e.stopPropagation();
-        showStep(1);
-    });
-
-    const prvStepBtn = document.getElementById('prevStep');
-    if (prvStepBtn) prvStepBtn.addEventListener('click', (e) => {
-        e.preventDefault(); e.stopPropagation();
-        showStep(1);
-    });
-
-    const skipMoodBtn = document.getElementById('skipMoodBtn');
-    if (skipMoodBtn) skipMoodBtn.addEventListener('click', (e) => {
-        e.preventDefault(); e.stopImmediatePropagation();
-        metricsSkipped = true;
-        showStep(2);
-        if (entryText) entryText.focus();
-    });
-
-    // Custom Fields Config (Settings)
-    const addCustomFieldBtn = document.getElementById('addCustomFieldBtn');
-    if (addCustomFieldBtn) {
-        addCustomFieldBtn.addEventListener('click', (e) => {
-            e.preventDefault(); e.stopPropagation();
-            customFieldsConfig.push({ label: 'Nuevo Campo', type: 'checkbox' });
-            localStorage.setItem('journAI_custom_fields', JSON.stringify(customFieldsConfig));
-            renderCustomFieldsConfig();
-        });
-    }
-
-    // Other Global Actions
-    const highlightsBtn = document.getElementById('highlightsBtn');
-    if (highlightsBtn) highlightsBtn.addEventListener('click', openHighlights);
-    
-    const aiBtn = document.getElementById('aiFormatBtn');
-    if (aiBtn) aiBtn.addEventListener('click', refineTextWithAI);
-
-    const modelSelector = document.getElementById('modelSelector');
-    if (modelSelector) {
-        modelSelector.addEventListener('change', (e) => {
-            localStorage.setItem('gemini_selected_model', e.target.value);
-        });
-    }
-
     const importBtn = document.getElementById('importDocBtn');
     if (importBtn) importBtn.addEventListener('click', handleGoogleDocImport);
 
@@ -1904,15 +1875,6 @@ document.addEventListener('DOMContentLoaded', () => {
             reader.readAsText(file);
         });
     }
-
-    const deleteEntryBtn = document.getElementById('deleteEntry');
-    if (deleteEntryBtn) {
-        deleteEntryBtn.addEventListener('click', (e) => {
-            e.preventDefault();
-            const dateKey = selectedDate ? getDateKey(selectedDate) : null;
-            if (dateKey && deleteEntry(dateKey)) closeModal();
-        });
-    }
 });
 
 // Initialize in sequence
@@ -1927,6 +1889,21 @@ initApp();
 
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js?v=40').catch(err => console.log(err));
+        // Register sw.js with a version query to force browser to check it
+        navigator.serviceWorker.register('./sw.js?v=20').catch(err => console.log(err));
     });
 }
+
+// Global Event Listeners
+document.addEventListener('DOMContentLoaded', () => {
+    // Other listeners already initialized at top-level or other DOMContentLoaded blocks
+    const aiBtn = document.getElementById('aiFormatBtn');
+    if (aiBtn) aiBtn.addEventListener('click', refineTextWithAI);
+
+    const modelSelector = document.getElementById('modelSelector');
+    if (modelSelector) {
+        modelSelector.addEventListener('change', (e) => {
+            localStorage.setItem('gemini_selected_model', e.target.value);
+        });
+    }
+});
