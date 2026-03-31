@@ -1858,7 +1858,7 @@ initApp();
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
         // Register sw.js with a version query to force browser to check it
-        navigator.serviceWorker.register('./sw.js?v=20').catch(err => console.log(err));
+        navigator.serviceWorker.register('./sw.js?v=38').catch(err => console.log(err));
     });
 }
 
