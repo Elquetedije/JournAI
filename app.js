@@ -935,40 +935,78 @@ function saveTrackersState() {
     });
 }
 
+function parseTrackersFromText(text) {
+    if (!text) return [];
+    const blockStart = text.indexOf('\n\n--- Rastreadores ---');
+    if (blockStart === -1) return [];
+    
+    // length of "\n\n--- Rastreadores ---\n" is 23
+    const blockStr = text.substring(blockStart + 23);
+    const lines = blockStr.split('\n');
+    const trackers = [];
+    
+    lines.forEach(line => {
+        if (line.startsWith('- ')) {
+            const colonIdx = line.indexOf(':');
+            if (colonIdx !== -1) {
+                const name = line.substring(2, colonIdx).trim();
+                const value = line.substring(colonIdx + 1).trim();
+                trackers.push({ name, value });
+            }
+        }
+    });
+    return trackers;
+}
+
 function injectTrackers() {
     saveTrackersState();
     if (!entryText) return;
     
-    let hasValues = false;
-    let trackerText = "\n\n--- Rastreadores ---\n";
+    const currentText = entryText.value;
+    const blockStart = currentText.indexOf('\n\n--- Rastreadores ---');
+    let textBeforeTrackers = currentText;
+    let oldTrackers = [];
     
+    if (blockStart !== -1) {
+        textBeforeTrackers = currentText.substring(0, blockStart);
+        oldTrackers = parseTrackersFromText(currentText);
+    }
+    
+    // Base the merged list on any old trackers that were already in the text
+    let mergedTrackers = [...oldTrackers];
+    
+    // Iterate over active configuration, applying the UI modifications
     trackersConfig.forEach(t => {
         const val = activeTrackersState[t.id];
+        const existingIdx = mergedTrackers.findIndex(x => x.name === t.name);
+        
         if (val && val.trim() !== '') {
-            trackerText += `- ${t.name}: ${val}\n`;
-            hasValues = true;
+            // Update or push
+            if (existingIdx !== -1) {
+                mergedTrackers[existingIdx].value = val;
+            } else {
+                mergedTrackers.push({ name: t.name, value: val });
+            }
+        } else {
+            // It's empty/blank -> "No value". If it existed, remove it cleanly
+            if (existingIdx !== -1) {
+                mergedTrackers.splice(existingIdx, 1);
+            }
         }
     });
     
-    // Check if trackers block already exists, if so replace it, else append
-    const currentText = entryText.value;
-    const blockStart = currentText.indexOf('\n\n--- Rastreadores ---');
-    
-    if (!hasValues) {
-        if (blockStart !== -1) {
-            // Remove the block entirely if all trackers are unset
-            entryText.value = currentText.substring(0, blockStart);
-        }
+    // Reconstruct text
+    if (mergedTrackers.length === 0) {
+        entryText.value = textBeforeTrackers;
         return;
     }
-
-    if (blockStart !== -1) {
-        // Replace existing block
-        entryText.value = currentText.substring(0, blockStart) + trackerText;
-    } else {
-        // Append
-        entryText.value = currentText + trackerText;
-    }
+    
+    let trackerText = "\n\n--- Rastreadores ---\n";
+    mergedTrackers.forEach(m => {
+        trackerText += `- ${m.name}: ${m.value}\n`;
+    });
+    
+    entryText.value = textBeforeTrackers + trackerText;
 }
 
 
@@ -1015,6 +1053,15 @@ function openModal(date) {
     const isToday = date.toDateString() === new Date().toDateString();
     const isNew = !entry;
     const data = entry || { text: "", mood: 5, activity: 5, health: 5 };
+    
+    // Recover Tracker state from the existing structured text string
+    const existingTrackersList = parseTrackersFromText(data.text);
+    existingTrackersList.forEach(tr => {
+        const found = trackersConfig.find(tc => tc.name === tr.name);
+        if (found) {
+            activeTrackersState[found.id] = tr.value;
+        }
+    });
     
     if (modalDateTitle) {
         modalDateTitle.textContent = isToday ? "Mi Día" : `${date.getDate()} ${monthNames[date.getMonth()]}`;
