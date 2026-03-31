@@ -190,8 +190,8 @@
                                 <div class="tracker-config-form">
                                     <input type="text" id="newTrackerName" class="action-input-premium" placeholder="Nombre (ej. Gimnasio)">
                                     <select id="newTrackerType" class="action-select-premium">
-                                        <option value="boolean">Sí / No</option>
-                                        <option value="number">Cifra (Número)</option>
+                                        <option value="boolean">Blanco / Sí / No</option>
+                                        <option value="number">Blanco / Cifra</option>
                                     </select>
                                     <button id="addTrackerBtn" class="primary-btn-outline" style="min-width: 80px;">Añadir</button>
                                 </div>
@@ -278,7 +278,7 @@
                 <!-- Step 1: Metrics Reflection -->
                 <div id="step1" class="entry-step active">
                     <div class="step1-header">
-                        <button id="skipMoodBtn" class="skip-btn-premium">Saltar →</button>
+                        <button id="skipMoodBtn" class="skip-btn-premium" style="margin-left:auto;">Saltar →</button>
                     </div>
                     
                     <section class="reflection-main">
@@ -301,10 +301,10 @@
                         </div>
                     </section>
                     <footer class="modal-footer">
-                        <div class="swipe-indicator" id="swipeUpIndicator">
-                            <span>Desliza para Rastreadores</span>
-                            <div class="chevron"></div>
-                        </div>
+                        <button id="nextStep" class="primary-btn">
+                            <span>Siguiente</span>
+                            <span>→</span>
+                        </button>
                     </footer>
                 </div>
 

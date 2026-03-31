@@ -12,6 +12,7 @@ let metricsSkipped = false;
 
 // Tracker Management
 let trackersConfig = JSON.parse(localStorage.getItem('journAI_trackers_config')) || [];
+let activeTrackersState = {}; // Temp store for modal session
 
 function getEntries() {
     return JSON.parse(localStorage.getItem('journAI_entries') || '{}');
@@ -896,60 +897,70 @@ function closeModal() {
 }
 
 const nxtStepBtnFrom1b = document.getElementById('nextStepFrom1b');
-const nxtStepBtn = document.getElementById('nextStep'); // To text
-const prvStepBtn = document.getElementById('prevStep'); // Back from Text
-const prvStepBtnFrom1b = document.getElementById('prevStepFrom1b'); // Back from Trackers
+const nxtStepBtn = document.getElementById('nextStep'); // From 1 to 1b
+const prvStepBtn = document.getElementById('prevStep'); // Back from Text to 1b
+const prvStepBtnFrom1b = document.getElementById('prevStepFrom1b'); // Back from Trackers to 1
 const skipTrackersBtn = document.getElementById('skipTrackersBtn');
-const swipeUpIndicator = document.getElementById('swipeUpIndicator');
-
-if (swipeUpIndicator) {
-    swipeUpIndicator.addEventListener('click', () => showStep('1b'));
-}
+const skipMoodBtn = document.getElementById('skipMoodBtn'); // Skip 1 to 1b
 
 if (prvStepBtnFrom1b) {
-    prvStepBtnFrom1b.addEventListener('click', () => showStep(1));
+    prvStepBtnFrom1b.addEventListener('click', () => {
+        saveTrackersState();
+        showStep(1);
+    });
 }
 
-if (nxtStepBtn) { // from step 1
+if (nxtStepBtn) { // from step 1 to 1b
     nxtStepBtn.addEventListener('click', () => {
         metricsSkipped = false;
-        showStep(2);
-        if (entryText) entryText.focus();
+        showStep('1b');
+    });
+}
+
+if (skipMoodBtn) { // skip step 1 to 1b
+    skipMoodBtn.addEventListener('click', () => {
+        metricsSkipped = true;
+        showStep('1b');
+    });
+}
+
+function saveTrackersState() {
+    const container = document.getElementById('activeTrackersContainer');
+    if (!container) return;
+    const inputs = container.querySelectorAll('.tracker-val');
+    inputs.forEach(input => {
+        const id = input.dataset.id;
+        activeTrackersState[id] = input.value;
     });
 }
 
 function injectTrackers() {
-    const container = document.getElementById('activeTrackersContainer');
-    if (!container || !entryText) return;
+    saveTrackersState();
+    if (!entryText) return;
     
-    const inputs = container.querySelectorAll('.tracker-val');
     let hasValues = false;
     let trackerText = "\n\n--- Rastreadores ---\n";
     
-    inputs.forEach(input => {
-        const name = input.dataset.name;
-        const type = input.dataset.type;
-        let valueStr = '';
-        
-        if (type === 'boolean') {
-            valueStr = input.checked ? 'Sí' : 'No';
+    trackersConfig.forEach(t => {
+        const val = activeTrackersState[t.id];
+        if (val && val.trim() !== '') {
+            trackerText += `- ${t.name}: ${val}\n`;
             hasValues = true;
-        } else if (type === 'number') {
-            if (input.value.trim() !== '') {
-                valueStr = input.value;
-                hasValues = true;
-            }
-        }
-        if (valueStr !== '') {
-            trackerText += `- ${name}: ${valueStr}\n`;
         }
     });
-    
-    if (!hasValues) return;
     
     // Check if trackers block already exists, if so replace it, else append
     const currentText = entryText.value;
     const blockStart = currentText.indexOf('\n\n--- Rastreadores ---');
+    
+    if (!hasValues) {
+        if (blockStart !== -1) {
+            // Remove the block entirely if all trackers are unset
+            entryText.value = currentText.substring(0, blockStart);
+        }
+        return;
+    }
+
     if (blockStart !== -1) {
         // Replace existing block
         entryText.value = currentText.substring(0, blockStart) + trackerText;
@@ -958,6 +969,7 @@ function injectTrackers() {
         entryText.value = currentText + trackerText;
     }
 }
+
 
 if (nxtStepBtnFrom1b) {
     nxtStepBtnFrom1b.addEventListener('click', () => {
@@ -975,34 +987,6 @@ if (skipTrackersBtn) {
 }
 
 if (prvStepBtn) prvStepBtn.addEventListener('click', () => showStep('1b'));
-
-// Modal Swipe Events for Step1 -> Step1b
-let modalTouchStartY = 0;
-const step1 = document.getElementById('step1');
-const step1b = document.getElementById('step1b');
-
-if (step1) {
-    step1.addEventListener('touchstart', e => modalTouchStartY = e.touches[0].pageY, {passive: true});
-    step1.addEventListener('touchend', e => {
-        if (modalTouchStartY === 0) return;
-        const deltaY = e.changedTouches[0].pageY - modalTouchStartY;
-        // Swipe Up -> go to 1b
-        if (deltaY < -40) {
-            showStep('1b');
-        }
-    });
-}
-if (step1b) {
-    step1b.addEventListener('touchstart', e => modalTouchStartY = e.touches[0].pageY, {passive: true});
-    step1b.addEventListener('touchend', e => {
-        if (modalTouchStartY === 0) return;
-        const deltaY = e.changedTouches[0].pageY - modalTouchStartY;
-        // Swipe Down -> go back to 1
-        if (deltaY > 50) {
-            showStep(1);
-        }
-    });
-}
 
 function checkTodayEntry() {
     const entries = getEntries();
@@ -1022,6 +1006,7 @@ function checkTodayEntry() {
 function openModal(date) {
     selectedDate = date;
     metricsSkipped = false;
+    activeTrackersState = {}; // Reset tracker state on open
     const entries = getEntries();
     const dateKey = getDateKey(date);
     const entry = entries[dateKey];
@@ -1064,11 +1049,10 @@ if (saveEntryBtn) saveEntryBtn.addEventListener('click', () => {
     }
 });
 
-const skipMoodBtn = document.getElementById('skipMoodBtn');
-if (skipMoodBtn) skipMoodBtn.addEventListener('click', () => {
+const rawSkipMoodBtn = document.getElementById('skipMoodBtn');
+if (rawSkipMoodBtn) rawSkipMoodBtn.addEventListener('click', () => {
     metricsSkipped = true;
-    showStep(2);
-    if (entryText) entryText.focus();
+    showStep('1b');
 });
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -1169,7 +1153,7 @@ function renderTrackerConfigList() {
         div.innerHTML = `
             <div class="tracker-item-info">
                 <span class="tracker-item-name">${t.name}</span>
-                <span class="tracker-item-type">${t.type === 'boolean' ? 'Sí / No' : 'Cifra'}</span>
+                <span class="tracker-item-type">${t.type === 'boolean' ? 'Blanco / Sí / No' : 'Blanco / Cifra'}</span>
             </div>
             <button class="delete-tracker-btn" data-id="${t.id}" title="Eliminar">×</button>
         `;
@@ -1219,19 +1203,21 @@ function renderActiveTrackers() {
     trackersConfig.forEach(t => {
         const div = document.createElement('div');
         div.className = 'tracker-input-row';
+        const currentVal = activeTrackersState[t.id] || '';
         
         if (t.type === 'boolean') {
             div.innerHTML = `
                 <label>${t.name}</label>
-                <label class="tracker-toggle">
-                    <input type="checkbox" class="tracker-val" data-type="boolean" data-name="${t.name}">
-                    <span class="toggle-slider"></span>
-                </label>
+                <select class="action-select-premium tracker-val tracker-dropdown" data-id="${t.id}" data-name="${t.name}">
+                    <option value="" ${currentVal === '' ? 'selected' : ''}>-</option>
+                    <option value="Sí" ${currentVal === 'Sí' ? 'selected' : ''}>Sí</option>
+                    <option value="No" ${currentVal === 'No' ? 'selected' : ''}>No</option>
+                </select>
             `;
         } else {
             div.innerHTML = `
                 <label>${t.name}</label>
-                <input type="number" class="tracker-num-input tracker-val" data-type="number" data-name="${t.name}" placeholder="0">
+                <input type="number" class="tracker-num-input tracker-val" data-id="${t.id}" data-name="${t.name}" placeholder="0" value="${currentVal}">
             `;
         }
         
@@ -1583,13 +1569,27 @@ async function refineTextWithAI() {
     const textArea = document.getElementById('entryText');
     if (!aiBtn || !textArea || !textArea.value.trim()) return;
 
-    const originalText = textArea.value;
+    const fullText = textArea.value;
     const apiKey = localStorage.getItem('gemini_api_key');
     const selectedModel = localStorage.getItem('gemini_selected_model');
     
     if (!selectedModel) {
         alert('Por favor, selecciona un modelo de IA en el Centro de Control.');
         if (settingsModal) settingsModal.classList.remove('hidden');
+        return;
+    }
+
+    // Separate Trackers section to protect it
+    let textToRefine = fullText;
+    let trackersBlock = "";
+    const blockStart = fullText.indexOf('\n\n--- Rastreadores ---');
+    if (blockStart !== -1) {
+        textToRefine = fullText.substring(0, blockStart);
+        trackersBlock = fullText.substring(blockStart);
+    }
+
+    if (!textToRefine.trim()) {
+        alert('No hay texto suficiente para refinar.');
         return;
     }
 
@@ -1604,7 +1604,7 @@ async function refineTextWithAI() {
             body: JSON.stringify({
                 contents: [{
                     parts: [{
-                        text: `Refina el siguiente texto de un diario. Elimina muletillas y redundancias, y mejora la separación mediante puntos, comas y párrafos. NO cambies el significado ni el contenido bajo ningún concepto. Devuelve SOLO el texto refinado, sin comentarios ni explicaciones adicionales: \n\n${originalText}`
+                        text: `Refina el siguiente texto de un diario. Elimina muletillas y redundancias, y mejora la separación mediante puntos, comas y párrafos. NO cambies el significado ni el contenido bajo ningún concepto. Devuelve SOLO el texto refinado, sin comentarios ni explicaciones adicionales: \n\n${textToRefine}`
                     }]
                 }]
             })
@@ -1619,7 +1619,7 @@ async function refineTextWithAI() {
 
         const data = await response.json();
         if (data.candidates && data.candidates[0].content.parts[0].text) {
-            textArea.value = data.candidates[0].content.parts[0].text.trim();
+            textArea.value = data.candidates[0].content.parts[0].text.trim() + trackersBlock;
         } else {
             console.error('[AI] Invalid response format', data);
             alert('No se pudo refinar el texto.');
