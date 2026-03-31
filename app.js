@@ -896,24 +896,36 @@ function closeModal() {
     showStep(1);
 }
 
-const nxtStepBtn = document.getElementById('nextStep');
-if (nxtStepBtn) nxtStepBtn.addEventListener('click', () => {
-    metricsSkipped = false;
-    showStep(2);
-    if (entryText) entryText.focus();
+document.addEventListener('DOMContentLoaded', () => {
+    const nxtStepBtn = document.getElementById('nextStep');
+    if (nxtStepBtn) nxtStepBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        metricsSkipped = false;
+        showStep(2); // Go directly to text input as requested
+        if (entryText) entryText.focus();
+    });
+
+    const nextToTextBtn = document.getElementById('nextToText');
+    if (nextToTextBtn) nextToTextBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        showStep(2);
+        if (entryText) entryText.focus();
+    });
+
+    const backToMetricsBtn = document.getElementById('backToMetrics');
+    if (backToMetricsBtn) backToMetricsBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        showStep(1);
+    });
+
+    const prvStepBtn = document.getElementById('prevStep');
+    if (prvStepBtn) prvStepBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        // If we came from custom fields, we might want to go back there? 
+        // For now, back to metrics is safer as per previous flow.
+        showStep(1);
+    });
 });
-
-const nextToTextBtn = document.getElementById('nextToText');
-if (nextToTextBtn) nextToTextBtn.addEventListener('click', () => {
-    showStep(2);
-    if (entryText) entryText.focus();
-});
-
-const backToMetricsBtn = document.getElementById('backToMetrics');
-if (backToMetricsBtn) backToMetricsBtn.addEventListener('click', () => showStep(1));
-
-const prvStepBtn = document.getElementById('prevStep');
-if (prvStepBtn) prvStepBtn.addEventListener('click', () => showStep(1));
 
 function checkTodayEntry() {
     const entries = getEntries();
@@ -991,11 +1003,16 @@ if (saveEntryBtn) saveEntryBtn.addEventListener('click', () => {
     }
 });
 
-const skipMoodBtn = document.getElementById('skipMoodBtn');
-if (skipMoodBtn) skipMoodBtn.addEventListener('click', () => {
-    metricsSkipped = true;
-    showStep(2);
-    if (entryText) entryText.focus();
+document.addEventListener('DOMContentLoaded', () => {
+    const skipMoodBtn = document.getElementById('skipMoodBtn');
+    if (skipMoodBtn) skipMoodBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        metricsSkipped = true;
+        // Skip metrics and custom fields, go directly to text
+        showStep(2);
+        if (entryText) entryText.focus();
+    });
 });
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -1152,15 +1169,20 @@ const mainContent = document.querySelector('.main-content');
 const sidebar = document.querySelector('.sidebar');
 
 window.addEventListener('touchstart', (e) => {
-    // If a modal is open, we only allow gestures if it's the entryModal
     const isModalOpen = document.querySelector('.modal:not(.hidden), .modal-overlay:not(.hidden)');
+    // If a modal is open, we ONLY allow gestures if it's the entryModal
     if (isModalOpen && isModalOpen.id !== 'entryModal') return;
 
-    if (window.scrollY === 0) {
-        touchStartX = e.touches[0].pageX;
-        touchStartY = e.touches[0].pageY;
+    touchStartX = e.touches[0].pageX;
+    touchStartY = e.touches[0].pageY;
+    if (window.scrollY === 0 || isModalOpen) {
         touchStartPos = e.touches[0].pageY;
-        // Disable transitions during pull
+    } else {
+        touchStartPos = 0;
+    }
+    
+    // Disable transitions during pull
+    if (!isModalOpen) {
         if (mainContent) mainContent.style.transition = 'none';
         if (sidebar) sidebar.style.transition = 'none';
     }
@@ -1236,15 +1258,15 @@ window.addEventListener('touchend', (e) => {
     }
 
     // Vertical Swipe logic (Swipe Up for Custom step, Swipe Down to go back)
-    if (isEntryModal && Math.abs(deltaY) > 70 && Math.abs(deltaY) > Math.abs(deltaX) * 1.5) {
+    if (isEntryModal && Math.abs(deltaY) > 50 && Math.abs(deltaY) > Math.abs(deltaX)) {
         const step1 = document.getElementById('step1');
         const stepCustom = document.getElementById('stepCustom');
         
-        if (deltaY < -70) { // Swipe Up
+        if (deltaY < -50) { // Swipe Up
             if (step1 && step1.classList.contains('active')) {
                 showStep('custom');
             }
-        } else if (deltaY > 70) { // Swipe Down
+        } else if (deltaY > 50) { // Swipe Down
             if (stepCustom && stepCustom.classList.contains('active')) {
                 showStep(1);
             }
@@ -1297,14 +1319,17 @@ window.removeCustomField = (index) => {
     renderCustomFieldsConfig();
 };
 
-const addCustomFieldBtn = document.getElementById('addCustomFieldBtn');
-if (addCustomFieldBtn) {
-    addCustomFieldBtn.addEventListener('click', () => {
-        customFieldsConfig.push({ label: 'Nuevo Campo', type: 'checkbox' });
-        localStorage.setItem('journAI_custom_fields', JSON.stringify(customFieldsConfig));
-        renderCustomFieldsConfig();
-    });
-}
+document.addEventListener('DOMContentLoaded', () => {
+    const addCustomFieldBtn = document.getElementById('addCustomFieldBtn');
+    if (addCustomFieldBtn) {
+        addCustomFieldBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            customFieldsConfig.push({ label: 'Nuevo Campo', type: 'checkbox' });
+            localStorage.setItem('journAI_custom_fields', JSON.stringify(customFieldsConfig));
+            renderCustomFieldsConfig();
+        });
+    }
+});
 
 function renderCustomFieldsEntry() {
     const container = document.getElementById('customFieldsContainer');
