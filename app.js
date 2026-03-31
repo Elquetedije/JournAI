@@ -896,36 +896,7 @@ function closeModal() {
     showStep(1);
 }
 
-document.addEventListener('DOMContentLoaded', () => {
-    const nxtStepBtn = document.getElementById('nextStep');
-    if (nxtStepBtn) nxtStepBtn.addEventListener('click', (e) => {
-        e.preventDefault();
-        metricsSkipped = false;
-        showStep(2); // Go directly to text input as requested
-        if (entryText) entryText.focus();
-    });
-
-    const nextToTextBtn = document.getElementById('nextToText');
-    if (nextToTextBtn) nextToTextBtn.addEventListener('click', (e) => {
-        e.preventDefault();
-        showStep(2);
-        if (entryText) entryText.focus();
-    });
-
-    const backToMetricsBtn = document.getElementById('backToMetrics');
-    if (backToMetricsBtn) backToMetricsBtn.addEventListener('click', (e) => {
-        e.preventDefault();
-        showStep(1);
-    });
-
-    const prvStepBtn = document.getElementById('prevStep');
-    if (prvStepBtn) prvStepBtn.addEventListener('click', (e) => {
-        e.preventDefault();
-        // If we came from custom fields, we might want to go back there? 
-        // For now, back to metrics is safer as per previous flow.
-        showStep(1);
-    });
-});
+// Consolidated navigation listeners at the end of the file
 
 function checkTodayEntry() {
     const entries = getEntries();
@@ -1015,24 +986,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 });
 
-document.addEventListener('DOMContentLoaded', () => {
-    const deleteEntryBtn = document.getElementById('deleteEntry');
-    if (deleteEntryBtn) {
-        console.log('[JournAI] Delete button found, attaching listener');
-        deleteEntryBtn.addEventListener('click', (e) => {
-            e.preventDefault();
-            const dateKey = selectedDate ? getDateKey(selectedDate) : null;
-            console.log('[JournAI] Delete button clicked', { selectedDate, dateKey });
-            
-            if (dateKey && deleteEntry(dateKey)) {
-                console.log('[JournAI] Entry deleted successfully');
-                closeModal();
-            } else if (!dateKey) {
-                console.error('[JournAI] Delete failed: No selectedDate');
-            }
-        });
-    }
-});
+// Delete button listener consolidated at the end of the file
 
 function getEntriesGrouped() {
     const entries = getEntries();
@@ -1258,15 +1212,16 @@ window.addEventListener('touchend', (e) => {
     }
 
     // Vertical Swipe logic (Swipe Up for Custom step, Swipe Down to go back)
-    if (isEntryModal && Math.abs(deltaY) > 50 && Math.abs(deltaY) > Math.abs(deltaX)) {
+    // Detection is more permissive now (40px threshold)
+    if (isEntryModal && Math.abs(deltaY) > 40 && Math.abs(deltaY) > Math.abs(deltaX)) {
         const step1 = document.getElementById('step1');
         const stepCustom = document.getElementById('stepCustom');
         
-        if (deltaY < -50) { // Swipe Up
+        if (deltaY < -40) { // Swipe Up -> Only works from Metrics
             if (step1 && step1.classList.contains('active')) {
                 showStep('custom');
             }
-        } else if (deltaY > 50) { // Swipe Down
+        } else if (deltaY > 40) { // Swipe Down -> Goes back to Metrics from wherever we are
             if (stepCustom && stepCustom.classList.contains('active')) {
                 showStep(1);
             }
@@ -1318,18 +1273,6 @@ window.removeCustomField = (index) => {
     localStorage.setItem('journAI_custom_fields', JSON.stringify(customFieldsConfig));
     renderCustomFieldsConfig();
 };
-
-document.addEventListener('DOMContentLoaded', () => {
-    const addCustomFieldBtn = document.getElementById('addCustomFieldBtn');
-    if (addCustomFieldBtn) {
-        addCustomFieldBtn.addEventListener('click', (e) => {
-            e.preventDefault();
-            customFieldsConfig.push({ label: 'Nuevo Campo', type: 'checkbox' });
-            localStorage.setItem('journAI_custom_fields', JSON.stringify(customFieldsConfig));
-            renderCustomFieldsConfig();
-        });
-    }
-});
 
 function renderCustomFieldsEntry() {
     const container = document.getElementById('customFieldsContainer');
@@ -1479,8 +1422,56 @@ function closeHighlights() {
     if (modal) modal.classList.add('hidden');
 }
 
-// Global Event Listeners for Highlights
+// --- INITIALIZATION & GLOBAL LISTENERS (CONSOLIDATED) ---
 document.addEventListener('DOMContentLoaded', () => {
+    // Modal Navigation & Step Transitions
+    const nxtStepBtn = document.getElementById('nextStep');
+    if (nxtStepBtn) nxtStepBtn.addEventListener('click', (e) => {
+        e.preventDefault(); e.stopPropagation();
+        metricsSkipped = false;
+        showStep(2); // Goes to text input (as requested by user to skip custom fields in the normal flow)
+        if (entryText) entryText.focus();
+    });
+
+    const nextToTextBtn = document.getElementById('nextToText');
+    if (nextToTextBtn) nextToTextBtn.addEventListener('click', (e) => {
+        e.preventDefault(); e.stopPropagation();
+        showStep(2);
+        if (entryText) entryText.focus();
+    });
+
+    const backToMetricsBtn = document.getElementById('backToMetrics');
+    if (backToMetricsBtn) backToMetricsBtn.addEventListener('click', (e) => {
+        e.preventDefault(); e.stopPropagation();
+        showStep(1);
+    });
+
+    const prvStepBtn = document.getElementById('prevStep');
+    if (prvStepBtn) prvStepBtn.addEventListener('click', (e) => {
+        e.preventDefault(); e.stopPropagation();
+        showStep(1);
+    });
+
+    const skipMoodBtn = document.getElementById('skipMoodBtn');
+    if (skipMoodBtn) skipMoodBtn.addEventListener('click', (e) => {
+        e.preventDefault(); e.stopImmediatePropagation();
+        metricsSkipped = true;
+        showStep(2);
+        if (entryText) entryText.focus();
+    });
+
+    // Custom Fields Config (Settings)
+    const addCustomFieldBtn = document.getElementById('addCustomFieldBtn');
+    if (addCustomFieldBtn) {
+        addCustomFieldBtn.addEventListener('click', (e) => {
+            e.preventDefault(); e.stopPropagation();
+            customFieldsConfig.push({ label: 'Nuevo Campo', type: 'checkbox' });
+            localStorage.setItem('journAI_custom_fields', JSON.stringify(customFieldsConfig));
+            renderCustomFieldsConfig();
+        });
+    }
+
+    // Other Global Actions
     const highlightsBtn = document.getElementById('highlightsBtn');
     if (highlightsBtn) highlightsBtn.addEventListener('click', openHighlights);
     
@@ -1492,6 +1483,15 @@ document.addEventListener('DOMContentLoaded', () => {
         backToHighlightsBtn.addEventListener('click', () => {
             closeModal();
             openHighlights();
+        });
+    }
+
+    const deleteEntryBtn = document.getElementById('deleteEntry');
+    if (deleteEntryBtn) {
+        deleteEntryBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            const dateKey = selectedDate ? getDateKey(selectedDate) : null;
+            if (dateKey && deleteEntry(dateKey)) closeModal();
         });
     }
 });
@@ -1823,8 +1823,69 @@ async function handleDeleteAll() {
     }
 }
 
-// Global Event Listeners Extension
+// --- INITIALIZATION & GLOBAL LISTENERS (CONSOLIDATED) ---
 document.addEventListener('DOMContentLoaded', () => {
+    // Modal Navigation & Step Transitions
+    const nxtStepBtn = document.getElementById('nextStep');
+    if (nxtStepBtn) nxtStepBtn.addEventListener('click', (e) => {
+        e.preventDefault(); e.stopPropagation();
+        metricsSkipped = false;
+        showStep(2); // Goes to text input (as requested by user to skip custom fields in the normal flow)
+        if (entryText) entryText.focus();
+    });
+
+    const nextToTextBtn = document.getElementById('nextToText');
+    if (nextToTextBtn) nextToTextBtn.addEventListener('click', (e) => {
+        e.preventDefault(); e.stopPropagation();
+        showStep(2);
+        if (entryText) entryText.focus();
+    });
+
+    const backToMetricsBtn = document.getElementById('backToMetrics');
+    if (backToMetricsBtn) backToMetricsBtn.addEventListener('click', (e) => {
+        e.preventDefault(); e.stopPropagation();
+        showStep(1);
+    });
+
+    const prvStepBtn = document.getElementById('prevStep');
+    if (prvStepBtn) prvStepBtn.addEventListener('click', (e) => {
+        e.preventDefault(); e.stopPropagation();
+        showStep(1);
+    });
+
+    const skipMoodBtn = document.getElementById('skipMoodBtn');
+    if (skipMoodBtn) skipMoodBtn.addEventListener('click', (e) => {
+        e.preventDefault(); e.stopImmediatePropagation();
+        metricsSkipped = true;
+        showStep(2);
+        if (entryText) entryText.focus();
+    });
+
+    // Custom Fields Config (Settings)
+    const addCustomFieldBtn = document.getElementById('addCustomFieldBtn');
+    if (addCustomFieldBtn) {
+        addCustomFieldBtn.addEventListener('click', (e) => {
+            e.preventDefault(); e.stopPropagation();
+            customFieldsConfig.push({ label: 'Nuevo Campo', type: 'checkbox' });
+            localStorage.setItem('journAI_custom_fields', JSON.stringify(customFieldsConfig));
+            renderCustomFieldsConfig();
+        });
+    }
+
+    // Other Global Actions
+    const highlightsBtn = document.getElementById('highlightsBtn');
+    if (highlightsBtn) highlightsBtn.addEventListener('click', openHighlights);
+    
+    const aiBtn = document.getElementById('aiFormatBtn');
+    if (aiBtn) aiBtn.addEventListener('click', refineTextWithAI);
+
+    const modelSelector = document.getElementById('modelSelector');
+    if (modelSelector) {
+        modelSelector.addEventListener('change', (e) => {
+            localStorage.setItem('gemini_selected_model', e.target.value);
+        });
+    }
+
     const importBtn = document.getElementById('importDocBtn');
     if (importBtn) importBtn.addEventListener('click', handleGoogleDocImport);
 
@@ -1843,6 +1904,15 @@ document.addEventListener('DOMContentLoaded', () => {
             reader.readAsText(file);
         });
     }
+
+    const deleteEntryBtn = document.getElementById('deleteEntry');
+    if (deleteEntryBtn) {
+        deleteEntryBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            const dateKey = selectedDate ? getDateKey(selectedDate) : null;
+            if (dateKey && deleteEntry(dateKey)) closeModal();
+        });
+    }
 });
 
 // Initialize in sequence
@@ -1857,21 +1927,6 @@ initApp();
 
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-        // Register sw.js with a version query to force browser to check it
-        navigator.serviceWorker.register('./sw.js?v=38').catch(err => console.log(err));
+        navigator.serviceWorker.register('./sw.js?v=40').catch(err => console.log(err));
     });
 }
-
-// Global Event Listeners
-document.addEventListener('DOMContentLoaded', () => {
-    // Other listeners already initialized at top-level or other DOMContentLoaded blocks
-    const aiBtn = document.getElementById('aiFormatBtn');
-    if (aiBtn) aiBtn.addEventListener('click', refineTextWithAI);
-
-    const modelSelector = document.getElementById('modelSelector');
-    if (modelSelector) {
-        modelSelector.addEventListener('change', (e) => {
-            localStorage.setItem('gemini_selected_model', e.target.value);
-        });
-    }
-});
