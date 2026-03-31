@@ -1554,6 +1554,33 @@ input[type="range"]::-webkit-slider-thumb {
   align-items: center;
 }
 
+.tracker-config-form .action-input-premium, 
+.tracker-config-form .action-select-premium {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: var(--radius-sm);
+  padding: 0.8rem 1rem;
+  font-size: 0.95rem;
+  color: #fff;
+  outline: none;
+  transition: var(--transition-smooth);
+}
+
+.tracker-config-form .action-select-premium {
+  padding-right: 2rem;
+  background-position: calc(100% - 10px) center;
+}
+
+.tracker-config-form .action-input-premium {
+  flex: 1;
+}
+
+.tracker-config-form .action-input-premium:focus,
+.tracker-config-form .action-select-premium:focus {
+  border-color: var(--accent-color);
+  background: rgba(255, 255, 255, 0.08);
+}
+
 .trackers-list {
   display: flex;
   flex-direction: column;
